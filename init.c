@@ -6,7 +6,7 @@
 /*   By: kiroussa <oss@xtrm.me>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/02/10 23:57:36 by kiroussa          #+#    #+#             */
-/*   Updated: 2025/02/11 05:33:05 by kiroussa         ###   ########.fr       */
+/*   Updated: 2025/02/11 14:36:18 by kiroussa         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,13 +19,16 @@ static void	signal_handler(int sig)
 	printf("init.c: signal_handler(%d)\n", sig);
 }
 
-int	main(int argc, char **argv)
+int	main(int argc, char **argv, char **envp)
 {
 	int	i;
 
 	i = 0;
 	while (++i < argc)
 		printf("argv[%d] = %s\n", i, argv[i]);
+	i = -1;
+	while (envp[++i])
+		printf("envp[%d] = '%s'\n", i, envp[i]);
 	i = -1;
 	while (++i < NSIG)
 		signal(i, signal_handler);
