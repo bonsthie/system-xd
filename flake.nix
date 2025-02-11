@@ -1,41 +1,28 @@
 {
-  description = "miniRT";
+  description = "userspace-digressions";
 
   inputs = {
-    systems.url = "github:nix-systems/x86_64-linux";
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    systems.url = "github:nix-systems/x86_64-linux";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    systems,
-  }@inputs:
+  outputs =
+    { self, nixpkgs, ... }@inputs:
     let
-      supportedSystems = import systems;
-      forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems (system: f (import nixpkgs { inherit system; }));
+      inherit (self) outputs;
+      systems = (import inputs.systems);
+      forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
-      devShell = forAllSystems (pkgs: 
+      devShells = forAllSystems (
+        system:
         let
-          stdenv = pkgs.llvmPackages_19.stdenv;
+          pkgs = import nixpkgs { inherit system; };
         in
-          pkgs.mkShell.override { inherit stdenv; } {
-            nativeBuildInputs = with pkgs; [
-              qemu
-              gdb
-              flex
-              bison
-              valgrind
-              zig
-              cpio
-              elfutils
-              openssl
-              pkg-config
-            ];
-          }
-        );
+        {
+          default = (import ./shell.nix) { inherit pkgs; };
+        }
+      );
     };
 }
-# vim: ts=2 sw=2 et
 
