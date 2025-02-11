@@ -33,11 +33,9 @@ $(KERNEL_DIR):
 	rm -rf $(KERNEL_TAR)
 	mv $(KERNEL_NAME) $(KERNEL_DIR)
 
-MISSING_PACKAGES := bison flex libelf
-
 $(KERNEL): $(KERNEL_DIR)
-	cd $(KERNEL_DIR) && env -i HOME=$(HOME) NIX_PATH=$(NIX_PATH) PATH=$(PATH) bash -c "nix-shell -p $(MISSING_PACKAGES) --command 'make defconfig'"
-	cd $(KERNEL_DIR) && env -i HOME=$(HOME) NIX_PATH=$(NIX_PATH) PATH=$(PATH) bash -c "nix-shell -p $(MISSING_PACAKGES) --command 'make'"
+	make -C $(KERNEL_DIR) defconfig
+	make -C $(KERNEL_DIR) -j$(shell nproc)
 
 GRAPHICS ?= 1
 run: $(KERNEL) $(INITRAMFS)
