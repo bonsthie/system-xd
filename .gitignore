@@ -4,3 +4,5 @@ kernel.*/
 *.o
 /init
 *.cpio
+.zig-cache/
+zig-out/
