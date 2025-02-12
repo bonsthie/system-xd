@@ -17,6 +17,7 @@ in
       elfutils
       openssl
       pkg-config
+      gcc
     ];
   }
 # vim: ts=2 sw=2 et
