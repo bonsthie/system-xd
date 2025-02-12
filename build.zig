@@ -77,6 +77,10 @@ pub fn addQemuSystemCommand(b: *Build, initramfsPath: *const Build.LazyPath) *st
     const runStep = step.Run.create(b, "run qemu");
     qemuRunStep.dependOn(&runStep.step);
 
+    if (tty_enabled) {
+        runStep.addArg("gnome-terminal");
+        runStep.addArg("--");
+    }
     runStep.addArg("qemu-system-x86_64");
     runStep.addArg("-kernel");
     runStep.addArg(KERNEL); // TODO: Compile the kernel in zig-cache and use addArgFile instead
