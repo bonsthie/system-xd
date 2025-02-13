@@ -12,6 +12,7 @@ in
       flex
       bison
       valgrind
+      libarchive
       zig
       cpio
       elfutils
