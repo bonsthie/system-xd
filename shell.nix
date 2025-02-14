@@ -1,24 +1,24 @@
-{
-  pkgs ? import <nixpkgs> {}
-}:
+{ pkgs, unstable-zig-flake }:
 
 let
-  stdenv = pkgs.llvmPackages_19.stdenv;
+  zig-unstable = unstable-zig-flake.packages.${pkgs.system}.default;
 in
-  pkgs.mkShell.override { inherit stdenv; } {
-    nativeBuildInputs = with pkgs; [
-      qemu
-      gdb
-      flex
-      bison
-      valgrind
-      zig
-      cpio
-      elfutils
-      openssl
-      pkg-config
-      gcc
-    ];
-  }
-# vim: ts=2 sw=2 et
+pkgs.mkShell {
+  nativeBuildInputs = with pkgs; [
+    qemu
+    gdb
+    flex
+    bison
+    valgrind
+    cpio
+    elfutils
+    openssl
+    pkg-config
+    gcc
+    zig-unstable
+  ];
 
+  shellHook = ''
+    echo "Zig (from GitHub flake) is available: $(zig version)"
+  '';
+}
