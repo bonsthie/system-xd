@@ -17,8 +17,5 @@ pkgs.mkShell {
     gcc
     zig-unstable
   ];
-
-  shellHook = ''
-    echo "Zig (from GitHub flake) is available: $(zig version)"
-  '';
+# vim: ts=2 sw=2 et
 }

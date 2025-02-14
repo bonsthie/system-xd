@@ -6,3 +6,5 @@ kernel.*/
 *.cpio
 .zig-cache/
 zig-out/
+*.iso
+*.img
