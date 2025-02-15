@@ -1,9 +1,10 @@
 { pkgs, unstable-zig-flake }:
 
 let
-  zig-unstable = unstable-zig-flake.packages.${pkgs.system}.default;
+  zig-unstable = pkgs.zig;# unstable-zig-flake.packages.${pkgs.system}.default;
+  stdenv = pkgs.llvmPackages_19.stdenv;
 in
-pkgs.mkShell {
+(pkgs.mkShell.override { inherit stdenv; }) {
   nativeBuildInputs = with pkgs; [
     qemu
     gdb

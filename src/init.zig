@@ -36,31 +36,25 @@ fn mountKernelVirtualFileSystems() !void {
 
 /// The true "main" function, which is where all the init stuff happens.
 pub fn cowabunga() !void {
-    const log = std.log.scoped(.cowabunga);
-    log.debug("Cowabunga!", .{});
+    const log = std.log.scoped(.init);
 
-    const Step = struct {
-        msg: []const u8,
-        func: *const fn () anyerror!void,
+    const steps = .{
+        .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
+        .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
+        .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
     };
-    const steps = [_]Step{
-        .{ .msg = "Setup signal handlers", .func = setupSignalHandlers },
-        .{ .msg = "Disable CAD syskey", .func = disableCADSyskey },
-        .{ .msg = "Mount kernel virtual filesystems", .func = mountKernelVirtualFileSystems },
-    };
-    for (steps) |step| {
-        log.debug("> Running {s}", .{step.msg});
+    inline for (steps) |step| {
+        log.debug("+ Running {s}", .{step.msg});
         const time = std.time.milliTimestamp();
         if (consts.debug) {
             step.func() catch |err| {
-                log.debug("!> Caught an unexpected error: {s}", .{@errorName(err)});
-                continue;
+                log.debug("! Caught an unexpected error: {s}, ignoring since debug mode.", .{@errorName(err)});
             };
         } else {
             try step.func();
+            const after = std.time.milliTimestamp();
+            log.debug("= Done in {d}ms", .{after - time});
         }
-        const after = std.time.milliTimestamp();
-        log.debug("< Done in {d}ms", .{after - time});
     }
 
     log.debug("Waiting for a signal...", .{});
