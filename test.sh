@@ -70,9 +70,10 @@ fi
 if [ $BUILD -eq 1 ]; then
 	pushd $RAMFS_GEN >/dev/null
 	log "Building initramfs"
-	fd . | cpio -o -H newc > ../$INITRAMFS_GEN.raw
+	fd . | cpio -o -H newc > $INITRAMFS_GEN.raw
 	log "Compressing initramfs"
-	gzip -9 $INITRAMFS_GEN.raw -c > ../$INITRAMFS_GEN
+	gzip -9 $INITRAMFS_GEN.raw -c > $INITRAMFS_GEN
+	rm -rf $INITRAMFS_GEN.raw
 	popd >/dev/null
 fi
 
