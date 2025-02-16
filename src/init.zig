@@ -5,6 +5,7 @@ const consts = @import("consts.zig");
 const wrapErrno = @import("errno.zig").wrapErrno;
 const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
+const parseKernelArgs = @import("args.zig").parseKernelArgs;
 
 fn noop() !void {
     log.debug("@ noop", .{});
@@ -63,6 +64,18 @@ fn dumpFs() !void {
 pub fn cowabunga() !void {
     _ = os.setsid();
 
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+
+    var args = parseKernelArgs(allocator) catch |err| {
+        log.err("Failed to parse kernel args: {s}", .{@errorName(err)});
+        return err;
+    };
+    defer args.deinit();
+    log.debug("Parsed kernel args: {}", .{args});
+
     const steps = .{
         .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
         .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
@@ -77,19 +90,20 @@ pub fn cowabunga() !void {
 
     inline for (steps) |step| {
         log.debug("+ Running {s}", .{step.msg});
-        const time = std.time.milliTimestamp();
-        if (consts.debug) {
-            step.func() catch |err| {
-                log.debug("! Caught an unexpected error: {s}. (debug ignore)", .{@errorName(err)});
-            };
-        } else {
-            try step.func();
-            const after = std.time.milliTimestamp();
-            log.debug("= Done in {d}ms", .{after - time});
-        }
+        const before = std.time.milliTimestamp();
+
+        step.func() catch |err| {
+            log.err("! Caught an unexpected error: {s}" ++ (if (consts.debug) ". (debug ignore)" else ""), .{@errorName(err)});
+            if (!consts.debug) {
+                return err;
+            }
+        };
+
+        const after = std.time.milliTimestamp();
+        log.debug("= Done in {d}ms", .{after - before});
     }
 
-    log.debug("Waiting for a signal...", .{});
+    log.debug("Dropping you to a shell for testing...", .{});
     return error.DropToShell;
     // while (true) {}
 }
