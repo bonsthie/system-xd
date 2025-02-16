@@ -21,51 +21,65 @@ if [ ! -d $DISTRO_BOOT ]; then
 fi
 
 INITRAMFS_ORIG=$DISTRO_BOOT/initramfs-virt
-INITRAMFS_GEN=$DISTRO_BOOT/initramfs-virt.gen
+INITRAMFS_GEN=${INITRAMFS_GEN:-$DISTRO_BOOT/initramfs-virt.gen}
 
 RAMFS_DUMP=$DISTRO_BOOT/ramfs-dump
 
 if [ ! -d $RAMFS_DUMP ]; then
 	log "Extracting initial initramfs"
 	pushd $DISTRO_BOOT >/dev/null
-	zcat initramfs-virt | cpio -idmv -D ${RAMFS_DUMP##*/}
+	zcat initramfs-virt | cpio -idmv -D ${RAMFS_DUMP##*/} 2>/dev/null
 	popd >/dev/null
 fi
 
 RAMFS_GEN=$DISTRO_BOOT/ramfs-gen
-
-log "Building system-xd"
-if [ -f $RAMFS_GEN/init ]; then
-	OLD_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
-fi
-zig build
-
-log "Generating initramfs"
+log "Copying ramfs to $RAMFS_GEN"
+rm -rf $RAMFS_GEN
 cp -r $RAMFS_DUMP $RAMFS_GEN
-rm -rf $RAMFS_GEN/init
-cp zig-out/bin/init $RAMFS_GEN/init
-NEW_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
 
+# Build and add /init
+NO_REPLACE_INIT=${NO_REPLACE_INIT:-0}
 BUILD=0
-if [ "$OLD_HASH" != "$NEW_HASH" ]; then
-	log "initramfs changed, rebuilding"
-	BUILD=1
-elif [ ! -f $INITRAMFS_GEN ]; then
-	log "initramfs not found, building"
-	BUILD=1
+if [ $NO_REPLACE_INIT -eq 0 ]; then
+	log "Building system-xd"
+	if [ -f $RAMFS_GEN/init ]; then
+		OLD_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
+	fi
+	zig build
+
+	log "Replacing init"
+	rm -rf $RAMFS_GEN/init
+	cp zig-out/bin/init $RAMFS_GEN/init
+	NEW_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
+
+	if [ "$OLD_HASH" != "$NEW_HASH" ]; then
+		log "initramfs changed, rebuilding"
+		BUILD=1
+	elif [ ! -f $INITRAMFS_GEN ]; then
+		log "initramfs not found, building"
+		BUILD=1
+	else
+		log "initramfs unchanged, skipping"
+	fi
 else
-	log "initramfs unchanged, skipping"
+	log "Skipping init replacement generation"
+	BUILD=1
+	cp -r $RAMFS_DUMP $RAMFS_GEN
 fi
 
 if [ $BUILD -eq 1 ]; then
-	pushd $DISTRO_BOOT >/dev/null
-	find . | cpio -o -H newc | gzip -9 > $INITRAMFS_GEN
+	pushd $RAMFS_GEN >/dev/null
+	log "Building initramfs"
+	fd . | cpio -o -H newc > ../$INITRAMFS_GEN.raw
+	log "Compressing initramfs"
+	gzip -9 $INITRAMFS_GEN.raw -c > ../$INITRAMFS_GEN
 	popd >/dev/null
 fi
 
 log "Launching qemu"
 # i have no idea what "sane" boot params are so i'm gonna guess this is gonna work and nobody is gonna bother actually checking any other configuration
 
+INITRAMFS_BOOT=${INITRAMFS_BOOT:-$INITRAMFS_GEN}
 GRAPHICS=${GRAPHICS:-0}
 if [ $GRAPHICS -eq 1 ]; then
 	set -x
@@ -73,7 +87,7 @@ if [ $GRAPHICS -eq 1 ]; then
 		-m 2048 \
 		-vga std \
 		-kernel $DISTRO_BOOT/vmlinuz-virt \
-		-initrd $INITRAMFS_GEN \
+		-initrd $INITRAMFS_BOOT \
 		-drive file=$ALPINE_FILE,format=raw,index=0 \
 		-append "modules=loop,squashfs,sd-mod,usb-storage quiet"
 else
@@ -81,9 +95,9 @@ else
 	qemu-system-x86_64 \
 		-m 2048 \
 		-kernel $DISTRO_BOOT/vmlinuz-virt \
-		-initrd $INITRAMFS_GEN \
+		-initrd $INITRAMFS_BOOT \
 		-drive file=$ALPINE_FILE,format=raw,index=0 \
 		-append "modules=loop,squashfs,sd-mod,usb-storage quiet" \
-		 -nographic \
-		 -append "console=ttyS0 console=tty0" && reset
+		-nographic \
+		-append "console=ttyS0 console=tty0" && reset
 fi

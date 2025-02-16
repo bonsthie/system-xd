@@ -14,6 +14,7 @@ in
     cpio
     libarchive
     elfutils
+    fd
     openssl
     pkg-config
     gcc
