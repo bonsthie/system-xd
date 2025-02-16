@@ -62,7 +62,7 @@ pub fn cowabunga() !void {
         .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
         .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
         .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
-        .{ .msg = "[Debug] Dump new state", .func = &dumpFs },
+        // .{ .msg = "[Debug] Dump new state", .func = &dumpFs },
         .{ .msg = "Mount fsroot as read-only & fsck", .func = &noop },
         .{ .msg = "Mount fsroot somewhere and set root (syscall i think? busybox change_root)", .func = &noop },
         .{ .msg = "Mount /etc/fstab", .func = &noop },
@@ -86,5 +86,6 @@ pub fn cowabunga() !void {
     }
 
     log.debug("Waiting for a signal...", .{});
-    while (true) {}
+    return error.DropToShell;
+    // while (true) {}
 }

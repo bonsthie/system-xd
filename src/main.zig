@@ -37,6 +37,10 @@ fn coerceProjectAuthors() []const u8 {
 }
 
 pub fn main() !void {
+    std.debug.print("Hello from main!\n", .{});
+    const writer = std.io.getStdOut().writer();
+    try writer.print("Hello from main2!\n", .{});
+
     const pid = os.getpid();
     log.debug("PID: {d}", .{pid});
     if (pid != 1) {

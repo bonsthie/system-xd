@@ -27,12 +27,12 @@ fn dumpFilesystemTreeImpl(dir: fs.Dir, depth: usize) !void {
                 std.debug.print("  ", .{});
             }
             if (is_dir) {
-                std.debug.print("- {s}/", .{name});
+                std.debug.print("- {s}/\n", .{name});
                 var sub = try dir.openDir(name, .{ .iterate = true });
                 defer sub.close();
                 try dumpFilesystemTreeImpl(sub, depth + 1);
             } else {
-                std.debug.print("- {s}", .{name});
+                std.debug.print("- {s}\n", .{name});
             }
         } else {
             break;
