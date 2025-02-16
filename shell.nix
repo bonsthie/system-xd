@@ -12,6 +12,7 @@ in
     bison
     valgrind
     cpio
+    libarchive
     elfutils
     openssl
     pkg-config

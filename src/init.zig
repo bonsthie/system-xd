@@ -3,6 +3,7 @@ const std = @import("std");
 const os = std.os.linux;
 const consts = @import("consts.zig");
 const errnoToError = @import("errno.zig").errnoToError;
+const dbg = @import("debug.zig");
 
 fn noop() !void {}
 
@@ -48,14 +49,20 @@ fn mountKernelVirtualFileSystems() !void {
     }
 }
 
+fn dumpFs() !void {
+    try dbg.dumpFilesystemTree(null);
+}
+
 /// The true "main" function, which is where all the init stuff happens.
 pub fn cowabunga() !void {
     const log = std.log.scoped(.init);
 
     const steps = .{
+        .{ .msg = "[Debug] Dump initramfs", .func = &dumpFs },
         .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
         .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
         .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
+        .{ .msg = "[Debug] Dump new state", .func = &dumpFs },
         .{ .msg = "Mount fsroot as read-only & fsck", .func = &noop },
         .{ .msg = "Mount fsroot somewhere and set root (syscall i think? busybox change_root)", .func = &noop },
         .{ .msg = "Mount /etc/fstab", .func = &noop },

@@ -12,15 +12,23 @@ if [ ! -d $DISTRO_BOOT ]; then
 	mv $TMP_TARGET $DISTRO_BOOT
 fi
 
-RAMFS_ORIG=$DISTRO_BOOT/boot/initramfs-virt
-RAMFS_GEN=$DISTRO_BOOT/boot/initramfs-virt.gen
+RAMFS_ORIG=$DISTRO_BOOT/initramfs-virt
+RAMFS_GEN=$DISTRO_BOOT/initramfs-virt.gen
 
-#TODO(kiroussa): append/replace /sbin/init to the initramfs
-cp $RAMFS_ORIG $RAMFS_GEN #remove this shit lol
+if [ ! -f $RAMFS_GEN ]; then
+	pushd $DISTRO_BOOT
+	zcat initramfs-virt | cpio -idmv -D ramfs-gen
+	popd
+	pushd $DISTRO_BOOT/ramfs-gen
+	# TODO: do modifications
+	
+	find . -type f | cpio -o -H newc | gzip -9 > ../../$RAMFS_GEN
+	popd
+fi
 
 # i have no idea what "sane" boot params are so i'm gonna guess this is gonna work and nobody is gonna bother actually checking any other configuration
 qemu-system-x86_64 \
-	-kernel $DISTRO_BOOT/boot/vmlinuz-virt \
+	-kernel $DISTRO_BOOT/vmlinuz-virt \
 	-initrd $RAMFS_GEN \
 	-drive file=$ALPINE_FILE,format=raw,index=0 \
 	-append "modules=loop,squashfs,sd-mod,usb-storage quiet" \

@@ -1,4 +1,5 @@
 .direnv/
+.distro
 kernel.*/
 *.out
 *.o
