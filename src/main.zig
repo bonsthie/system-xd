@@ -4,6 +4,7 @@ const os = std.os.linux;
 const fs = std.fs;
 const consts = @import("consts.zig");
 const customLogFn = @import("log.zig").customLogFn;
+const errno = @import("errno.zig");
 
 const init = @import("init.zig");
 
@@ -37,10 +38,6 @@ fn coerceProjectAuthors() []const u8 {
 }
 
 pub fn main() !void {
-    std.debug.print("Hello from main!\n", .{});
-    const writer = std.io.getStdOut().writer();
-    try writer.print("Hello from main2!\n", .{});
-
     const pid = os.getpid();
     log.debug("PID: {d}", .{pid});
     if (pid != 1) {
@@ -64,7 +61,8 @@ pub fn main() !void {
         const argv = &[_:null]?[*:0]const u8{ "/bin/sh", "-i" };
         const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
         const syscall_ret = os.execve("/bin/sh", argv, envp);
-        log.err("Failed to execve /bin/sh: E{s}", .{@tagName(os.E.init(syscall_ret))});
+        log.err("Failed to execve /bin/sh: E{s}, rebooting...", .{@tagName(os.E.init(syscall_ret))});
+        _ = os.sync();
         _ = os.reboot(os.LINUX_REBOOT.MAGIC1.MAGIC1, os.LINUX_REBOOT.MAGIC2.MAGIC2, os.LINUX_REBOOT.CMD.RESTART, null);
     };
 }

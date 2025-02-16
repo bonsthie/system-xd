@@ -33,23 +33,25 @@ if [ ! -d $RAMFS_DUMP ]; then
 fi
 
 RAMFS_GEN=$DISTRO_BOOT/ramfs-gen
-log "Copying ramfs to $RAMFS_GEN"
-rm -rf $RAMFS_GEN
-cp -r $RAMFS_DUMP $RAMFS_GEN
 
 # Build and add /init
 NO_REPLACE_INIT=${NO_REPLACE_INIT:-0}
 BUILD=0
 if [ $NO_REPLACE_INIT -eq 0 ]; then
-	log "Building system-xd"
 	if [ -f $RAMFS_GEN/init ]; then
 		OLD_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
 	fi
-	zig build
+
+	log "Building system-xd"
+	zig build || exit
+
+	log "Copying ramfs to $RAMFS_GEN"
+	rm -rf $RAMFS_GEN
+	cp -r $RAMFS_DUMP $RAMFS_GEN
 
 	log "Replacing init"
-	rm -rf $RAMFS_GEN/init
-	cp zig-out/bin/init $RAMFS_GEN/init
+	rm -vrf $RAMFS_GEN/init
+	cp -v zig-out/bin/init $RAMFS_GEN/init
 	NEW_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
 
 	if [ "$OLD_HASH" != "$NEW_HASH" ]; then
@@ -64,17 +66,35 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 else
 	log "Skipping init replacement generation"
 	BUILD=1
-	cp -r $RAMFS_DUMP $RAMFS_GEN
+	if [ -z $RAMFS_NOCOPY ]; then
+		cp -r $RAMFS_DUMP $RAMFS_GEN
+	fi
 fi
 
 if [ $BUILD -eq 1 ]; then
 	pushd $RAMFS_GEN >/dev/null
 	log "Building initramfs"
-	fd . | cpio -o -H newc > $INITRAMFS_GEN.raw
-	log "Compressing initramfs"
-	gzip -9 $INITRAMFS_GEN.raw -c > $INITRAMFS_GEN
-	rm -rf $INITRAMFS_GEN.raw
+	find . | sort | cpio -o --renumber-inodes -H newc > $INITRAMFS_GEN.raw
+	
+	INITRAMFS_COMPRESS=${INITRAMFS_COMPRESS:-0}
+	if [ $INITRAMFS_COMPRESS -eq 1 ]; then
+		log "Compressing initramfs"
+		gzip -9 $INITRAMFS_GEN.raw -c > $INITRAMFS_GEN
+	else
+		cp $INITRAMFS_GEN.raw $INITRAMFS_GEN
+	fi
 	popd >/dev/null
+
+	if [ ${INITRAMFS_TEST_EXTRACT:-0} -eq 1 ]; then
+		log "Test extracting new initramfs"
+		if [ $INITRAMFS_COMPRESS -eq 1 ]; then
+			zcat $INITRAMFS_GEN | cpio -idmv -D .distro/test-ramfs 2>/dev/null
+		else
+			cat $INITRAMFS_GEN | cpio -idmv -D .distro/test-ramfs 2>/dev/null
+		fi
+	fi
+
+	rm -rf $INITRAMFS_GEN.raw
 fi
 
 log "Launching qemu"
@@ -86,11 +106,10 @@ if [ $GRAPHICS -eq 1 ]; then
 	set -x
 	qemu-system-x86_64 \
 		-m 2048 \
-		-vga std \
 		-kernel $DISTRO_BOOT/vmlinuz-virt \
 		-initrd $INITRAMFS_BOOT \
 		-drive file=$ALPINE_FILE,format=raw,index=0 \
-		-append "modules=loop,squashfs,sd-mod,usb-storage quiet"
+		-append "modules=loop,squashfs,sd-mod,usb-storage"
 else
 	set -x
 	qemu-system-x86_64 \
@@ -98,7 +117,8 @@ else
 		-kernel $DISTRO_BOOT/vmlinuz-virt \
 		-initrd $INITRAMFS_BOOT \
 		-drive file=$ALPINE_FILE,format=raw,index=0 \
-		-append "modules=loop,squashfs,sd-mod,usb-storage quiet" \
+		-append "modules=loop,squashfs,sd-mod,usb-storage" \
+		-append "init=/bin/sh" \
 		-nographic \
-		-append "console=ttyS0 console=tty0" && reset
+		-append "console=ttyS0" && reset
 fi
