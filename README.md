@@ -12,6 +12,7 @@
 - https://man.freebsd.org/cgi/man.cgi?query=getty&sektion=8
 - https://github.com/torvalds/linux/blob/42dc814987c1feb6410904e58cfd4c36c4146150/tools/testing/selftests/wireguard/qemu/init.c
 - https://git.busybox.net/busybox/tree/util-linux/switch_root.c?h=1_37_stable
+- https://gitlab.alpinelinux.org/alpine/mkinitfs/-/blob/master/initramfs-init.in?ref_type=heads
 
 ## License
 
