@@ -19,8 +19,7 @@ pub fn parseKernelArgs(allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
             const allocated_arg = try allocator.dupe(u8, arg);
             // log.debug("Arg: {*}", .{&allocated_arg});
             map.put(allocated_arg, null) catch |err| {
-                var possible_map: ?std.StringHashMap(?[]u8) = map;
-                deinitKernelArgs(&possible_map);
+                deinitWrapOptional(map);
                 return err;
             };
             continue;
@@ -34,13 +33,17 @@ pub fn parseKernelArgs(allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
         // log.debug("Val: {*}", .{&allocated_val});
         // log.debug("Parsed kernel arg: {s}={s}", .{ allocated_key, allocated_val });
         map.put(allocated_key, allocated_val) catch |err| {
-            var possible_map: ?std.StringHashMap(?[]u8) = map;
-            deinitKernelArgs(&possible_map);
+            deinitWrapOptional(map);
             return err;
         };
     }
 
     return map;
+}
+
+inline fn deinitWrapOptional(map: std.StringHashMap(?[]u8)) void {
+    var possible_map: ?std.StringHashMap(?[]u8) = map;
+    deinitKernelArgs(&possible_map);
 }
 
 pub fn deinitKernelArgs(self: *?std.StringHashMap(?[]u8)) void {
