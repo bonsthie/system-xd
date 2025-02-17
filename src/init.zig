@@ -18,13 +18,32 @@ fn noop(_: *InitSystem) !void {
     log.debug("@ noop", .{});
 }
 
+fn createConsole(_: *InitSystem) !void {
+    const fs = std.fs.cwd();
+
+    for (0..100) |_| {
+        log.debug("rhaaa\n", .{});
+
+        const fd = try fs.openFile("/dev/console", .{});
+        defer fd.close();
+
+        _ = try wrapErrno(os.dup2(fd.handle, 0));
+        _ = try wrapErrno(os.dup2(fd.handle, 1));
+        _ = try wrapErrno(os.dup2(fd.handle, 2));
+
+        if (os.write(1, "\x00\x00\x00\x00\n", 5) == 5) {
+            return;
+        }
+    }
+}
+
 /// Sets-up common signal handlers.
 fn setupSignalHandlers(_: *InitSystem) !void {}
 
 /// Disables the Ctrl-Alt-Del syskey instantly rebooting the system.
 /// Instead, it sends a SIGINT to the init process (that's us!!!).
 fn disableCADSyskey(_: *InitSystem) !void {
-    const err = os.reboot(os.LINUX_REBOOT.MAGIC1.MAGIC1, os.LINUX_REBOOT.MAGIC2.MAGIC2, os.LINUX_REBOOT.CMD.CAD_OFF, null);
+    const err = os.reboot(.MAGIC1, .MAGIC2, .CAD_OFF, null);
     _ = try wrapErrno(err);
 }
 
@@ -33,11 +52,6 @@ fn disableCADSyskey(_: *InitSystem) !void {
 /// This includes: `/dev`, `/proc`, `/sys`, `/run`, `/tmp`.
 fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
     const slog = std.log.scoped(.mount);
-    const paths = .{ "/dev", "/proc", "/sys", "/run", "/tmp", "/var" };
-    inline for (paths) |path| {
-        try std.fs.cwd().makePath(path);
-    }
-
     const mounts = .{
         .{ "dev", "/dev", "devtmpfs", 0, 0 },
         .{ "proc", "/proc", "proc", 0, 0 },
@@ -45,9 +59,14 @@ fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
         .{ "tmpfs", "/tmp", "tmpfs", 0, 0 },
         .{ "run", "/run", "tmpfs", 0, 0 },
         .{ "none", "/sys/kernel/debug", "debugfs", 0, 0 },
+
         //TODO: check if we need cgroups?
         // .{ "none", "/sys/fs/cgroup", "tmpfs", 0, null },
     };
+
+    inline for (mounts) |mount| {
+        try std.fs.cwd().makePath(mount[1]);
+    }
     inline for (mounts) |mount| {
         slog.debug("+ Mounting {s}", .{mount[1]});
         _ = try wrapErrno(os.mount(mount[0], mount[1], mount[2], mount[3], mount[4]));
@@ -94,6 +113,7 @@ pub fn cowabunga() !void {
     // log.debug("Parsed kernel args: {}", .{args});
 
     const steps = .{
+        // .{ .msg = "Creation of a console", .func = &createConsole },
         .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
         .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
         .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
@@ -101,7 +121,6 @@ pub fn cowabunga() !void {
         .{ .msg = "Integrity check fsroot", .func = &noop },
         .{ .msg = "Mount fsroot and chroot", .func = &noop },
         .{ .msg = "Mount user filesystems", .func = &noop },
-        // .{ .msg = "Open /dev/console and /dev/tty0", .func = &noop },
         .{ .msg = "Start xd.aemon", .func = &noop },
         .{ .msg = "Open tty's and login", .func = &noop },
     };

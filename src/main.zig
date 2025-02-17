@@ -63,6 +63,6 @@ pub fn main() !void {
         const syscall_ret = os.execve("/bin/sh", argv, envp);
         log.err("Failed to execve /bin/sh: E{s}, rebooting...", .{@tagName(os.E.init(syscall_ret))});
         _ = os.sync();
-        _ = os.reboot(os.LINUX_REBOOT.MAGIC1.MAGIC1, os.LINUX_REBOOT.MAGIC2.MAGIC2, os.LINUX_REBOOT.CMD.RESTART, null);
+        _ = os.reboot(.MAGIC1, .MAGIC2, .RESTART, null);
     };
 }

@@ -100,25 +100,29 @@ fi
 log "Launching qemu"
 # i have no idea what "sane" boot params are so i'm gonna guess this is gonna work and nobody is gonna bother actually checking any other configuration
 
+# CMDLINE="console=ttyS0" 
+CMDLINE="modules=loop,squashfs,sd-mod,usb-storage console=ttyS0 init=/bin/sh"
+
 INITRAMFS_BOOT=${INITRAMFS_BOOT:-$INITRAMFS_GEN}
 GRAPHICS=${GRAPHICS:-0}
+echo $CMDLINE
 if [ $GRAPHICS -eq 1 ]; then
-	set -x
-	qemu-system-x86_64 \
-		-m 2048 \
-		-kernel $DISTRO_BOOT/vmlinuz-virt \
-		-initrd $INITRAMFS_BOOT \
-		-drive file=$ALPINE_FILE,format=raw,index=0 \
-		-append "modules=loop,squashfs,sd-mod,usb-storage"
+    log "qemu graphics version"
+    qemu-system-x86_64 \
+        -m 2048 \
+        -kernel $DISTRO_BOOT/vmlinuz-virt \
+        -initrd $INITRAMFS_BOOT \
+        -drive file=$ALPINE_FILE,format=raw,index=0 \
+        -append "$CMDLINE"
 else
-	set -x
-	qemu-system-x86_64 \
-		-m 2048 \
-		-kernel $DISTRO_BOOT/vmlinuz-virt \
-		-initrd $INITRAMFS_BOOT \
-		-drive file=$ALPINE_FILE,format=raw,index=0 \
-		-append "modules=loop,squashfs,sd-mod,usb-storage" \
-		-append "init=/bin/sh" \
-		-nographic \
-		-append "console=ttyS0" && reset
+    log "qemu tty version"
+    qemu-system-x86_64 \
+        -m 2048 \
+        -kernel $DISTRO_BOOT/vmlinuz-virt \
+        -initrd $INITRAMFS_BOOT \
+        -drive file=$ALPINE_FILE,format=raw,index=0 \
+        -append "modules=loop,squashfs,sd-mod,usb-storage" \
+        -append "init=/bin/sh" \
+        -nographic \
+        -append "$CMDLINE" && reset
 fi
