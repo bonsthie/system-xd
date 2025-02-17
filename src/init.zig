@@ -5,18 +5,25 @@ const consts = @import("consts.zig");
 const wrapErrno = @import("errno.zig").wrapErrno;
 const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
-const parseKernelArgs = @import("args.zig").parseKernelArgs;
+const argsModule = @import("args.zig");
+const parseKernelArgs = argsModule.parseKernelArgs;
+const deinitKernelArgs = argsModule.deinitKernelArgs;
 
-fn noop() !void {
+const InitSystem = struct {
+    allocator: std.mem.Allocator,
+    args: ?std.StringHashMap(?[]u8) = null,
+};
+
+fn noop(_: *InitSystem) !void {
     log.debug("@ noop", .{});
 }
 
 /// Sets-up common signal handlers.
-fn setupSignalHandlers() !void {}
+fn setupSignalHandlers(_: *InitSystem) !void {}
 
 /// Disables the Ctrl-Alt-Del syskey instantly rebooting the system.
 /// Instead, it sends a SIGINT to the init process (that's us!!!).
-fn disableCADSyskey() !void {
+fn disableCADSyskey(_: *InitSystem) !void {
     const err = os.reboot(os.LINUX_REBOOT.MAGIC1.MAGIC1, os.LINUX_REBOOT.MAGIC2.MAGIC2, os.LINUX_REBOOT.CMD.CAD_OFF, null);
     _ = try wrapErrno(err);
 }
@@ -24,7 +31,7 @@ fn disableCADSyskey() !void {
 /// Creates and mounts the common kernel-related filesystems.
 ///
 /// This includes: `/dev`, `/proc`, `/sys`, `/run`, `/tmp`.
-fn mountKernelVirtualFileSystems() !void {
+fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
     const slog = std.log.scoped(.mount);
     const paths = .{ "/dev", "/proc", "/sys", "/run", "/tmp", "/var" };
     inline for (paths) |path| {
@@ -56,7 +63,14 @@ fn mountKernelVirtualFileSystems() !void {
     }
 }
 
-fn dumpFs() !void {
+fn parseKernelArguments(system: *InitSystem) !void {
+    system.args = parseKernelArgs(system.allocator) catch |err| {
+        log.err("Failed to parse kernel args: {s}", .{@errorName(err)});
+        return err;
+    };
+}
+
+fn dumpFs(_: *InitSystem) !void {
     try dbg.dumpFilesystemTree(null);
 }
 
@@ -69,30 +83,34 @@ pub fn cowabunga() !void {
 
     const allocator = gpa.allocator();
 
-    var args = parseKernelArgs(allocator) catch |err| {
-        log.err("Failed to parse kernel args: {s}", .{@errorName(err)});
-        return err;
-    };
-    defer args.deinit();
-    log.debug("Parsed kernel args: {}", .{args});
+    var initSystem = InitSystem{ .allocator = allocator };
+    defer deinitKernelArgs(&initSystem.args);
+
+    // var args = parseKernelArgs(allocator) catch |err| {
+    //     log.err("Failed to parse kernel args: {s}", .{@errorName(err)});
+    //     return err;
+    // };
+    // defer deinitKernelArgs(&args);
+    // log.debug("Parsed kernel args: {}", .{args});
 
     const steps = .{
         .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
         .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
         .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
-        .{ .msg = "Mount fsroot as read-only & fsck", .func = &noop },
-        .{ .msg = "Mount fsroot somewhere and set root (syscall i think? busybox change_root)", .func = &noop },
-        .{ .msg = "Mount /etc/fstab", .func = &noop },
-        .{ .msg = "Open /dev/console and /dev/tty0", .func = &noop },
+        .{ .msg = "Parse kernel arguments", .func = &parseKernelArguments },
+        .{ .msg = "Integrity check fsroot", .func = &noop },
+        .{ .msg = "Mount fsroot and chroot", .func = &noop },
+        .{ .msg = "Mount user filesystems", .func = &noop },
+        // .{ .msg = "Open /dev/console and /dev/tty0", .func = &noop },
         .{ .msg = "Start xd.aemon", .func = &noop },
-        .{ .msg = "Open tty's and login?", .func = &noop },
+        .{ .msg = "Open tty's and login", .func = &noop },
     };
 
     inline for (steps) |step| {
-        log.debug("+ Running {s}", .{step.msg});
+        log.info("+ Running {s}", .{step.msg});
         const before = std.time.milliTimestamp();
 
-        step.func() catch |err| {
+        step.func(&initSystem) catch |err| {
             log.err("! Caught an unexpected error: {s}" ++ (if (consts.debug) ". (debug ignore)" else ""), .{@errorName(err)});
             if (!consts.debug) {
                 return err;
