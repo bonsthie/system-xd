@@ -87,6 +87,15 @@ fn parseKernelArguments(system: *InitSystem) !void {
         log.err("Failed to parse kernel args: {s}", .{@errorName(err)});
         return err;
     };
+
+    var it = system.args.?.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.*) |val| {
+            log.debug("Parsed kernel arg: {s}={s}", .{ entry.key_ptr.*, val });
+            continue;
+        }
+        log.debug("Parsed kernel arg: {s}", .{entry.key_ptr.*});
+    }
 }
 
 fn dumpFs(_: *InitSystem) !void {

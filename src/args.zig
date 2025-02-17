@@ -10,37 +10,40 @@ pub fn parseKernelArgs(allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
     const contents = try file.reader().readAllAlloc(allocator, 32 * 1024);
     defer allocator.free(contents);
 
-    var it = std.mem.split(u8, contents, " ");
+    var it = std.mem.tokenizeAny(u8, contents, " \t\n\r");
     while (it.next()) |arg| {
         if (arg.len == 0) continue;
-        log.debug("Found thing at {s}", .{arg});
+        // log.debug("Found thing at {s}", .{arg});
         const eq = std.mem.indexOfScalar(u8, arg, '=') orelse {
-            log.debug("Found no = at {s}", .{arg});
+            // log.debug("Found no = at {s}", .{arg});
             const allocated_arg = try allocator.dupe(u8, arg);
-            log.debug("Arg: {*}", .{&allocated_arg});
+            // log.debug("Arg: {*}", .{&allocated_arg});
             map.put(allocated_arg, null) catch |err| {
-                var possible_map: ?std.StringHashMap(?[]u8) = map;
-                deinitKernelArgs(&possible_map);
+                deinitWrapOptional(map);
                 return err;
             };
             continue;
         };
-        log.debug("Found = at {d}", .{eq});
+        // log.debug("Found = at {d}", .{eq});
         const key = arg[0..eq];
         const allocated_key = try allocator.dupe(u8, key);
-        log.debug("Key: {*}", .{&allocated_key});
+        // log.debug("Key: {*}", .{&allocated_key});
         const val = arg[eq + 1 ..];
         const allocated_val = try allocator.dupe(u8, val);
-        log.debug("Val: {*}", .{&allocated_val});
-        log.debug("Parsed kernel arg: {s}={s}", .{ allocated_key, allocated_val });
+        // log.debug("Val: {*}", .{&allocated_val});
+        // log.debug("Parsed kernel arg: {s}={s}", .{ allocated_key, allocated_val });
         map.put(allocated_key, allocated_val) catch |err| {
-            var possible_map: ?std.StringHashMap(?[]u8) = map;
-            deinitKernelArgs(&possible_map);
+            deinitWrapOptional(map);
             return err;
         };
     }
 
     return map;
+}
+
+inline fn deinitWrapOptional(map: std.StringHashMap(?[]u8)) void {
+    var possible_map: ?std.StringHashMap(?[]u8) = map;
+    deinitKernelArgs(&possible_map);
 }
 
 pub fn deinitKernelArgs(self: *?std.StringHashMap(?[]u8)) void {
