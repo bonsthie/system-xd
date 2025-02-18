@@ -1,8 +1,14 @@
 const os = @import("std").os.linux;
 
-pub fn wrapErrno(err: usize) anyerror!usize {
-    return switch (os.E.init(err)) {
-        os.E.SUCCESS => @as(usize, 0),
+pub fn wrapErrno(err: anytype) anyerror!@TypeOf(err) {
+    const errno: usize = switch (@TypeOf(err)) {
+        usize => err,
+        i32 => @as(usize, @bitCast(@as(isize, err))),
+        inline else => @bitCast(err),
+    };
+
+    return switch (os.E.init(errno)) {
+        os.E.SUCCESS => err,
         os.E.PERM => error.NoPermission,
         os.E.NOENT => error.NoEntry,
         os.E.SRCH => error.NoEntry,

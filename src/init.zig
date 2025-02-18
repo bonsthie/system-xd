@@ -21,30 +21,37 @@ fn noop(_: *InitSystem) !void {
 fn createConsole(_: *InitSystem) !void {
     const fs = std.fs.cwd();
 
-    for (0..100) |i| {
-        log.debug("test {}", .{i});
+    for (1..100) |i| {
+        log.debug("open /dev/console try [{}]", .{i});
 
         const fd = fs.openFile("/dev/console", .{ .mode = .read_write }) catch |err| {
-            log.info("/dev/console open fail : {}", .{err});
+            log.debug("/dev/console open fail : {}", .{err});
+            // sleep ???
             continue;
         };
         defer fd.close();
 
-        _ = try wrapErrno(os.dup2(fd.handle, 0));
-        _ = try wrapErrno(os.dup2(fd.handle, 1));
-        // _ = try wrapErrno(os.dup2(fd.handle, 2));
+        _ = try wrapErrno(os.dup2(fd.handle, os.STDIN_FILENO));
+        _ = try wrapErrno(os.dup2(fd.handle, os.STDOUT_FILENO));
+        _ = try wrapErrno(os.dup2(fd.handle, os.STDERR_FILENO));
 
         const ret = wrapErrno(os.write(1, "\x00\x00\x00\x00\n", 5)) catch |err| {
             log.debug("write fail {}", .{err});
             continue;
         };
         if (ret == 5) {
-            log.debug("/dev/console sucsses", .{});
+            // set the /dev/console as the controling terminal
+            const TIOCSCTTY: u32 = 0x540E;
+            _ = os.setsid();
+            _ = os.ioctl(fd.handle, TIOCSCTTY, 0);
+
+            log.info("/dev/console sucsses", .{});
             return;
         } else {
-            log.debug("write {} bytes", .{ret});
+            log.debug("fail only {} bytes write on 5", .{ret});
         }
     }
+    log.info("/dev/console open fail", .{});
 }
 
 /// Sets-up common signal handlers.
