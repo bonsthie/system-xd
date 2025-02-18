@@ -22,11 +22,11 @@ fn createConsole(_: *InitSystem) !void {
     const fs = std.fs.cwd();
 
     for (1..100) |i| {
-        log.debug("open /dev/console try [{}]", .{i});
+        log.debug("Open /dev/console try [{}]", .{i});
 
         const fd = fs.openFile("/dev/console", .{ .mode = .read_write }) catch |err| {
             log.debug("/dev/console open fail : {}", .{err});
-            // sleep ???
+            std.time.sleep(std.time.ns_per_s * 0.01);
             continue;
         };
         defer fd.close();
@@ -36,19 +36,18 @@ fn createConsole(_: *InitSystem) !void {
         _ = try wrapErrno(os.dup2(fd.handle, os.STDERR_FILENO));
 
         const ret = wrapErrno(os.write(1, "\x00\x00\x00\x00\n", 5)) catch |err| {
-            log.debug("write fail {}", .{err});
+            log.debug("Write fail {}", .{err});
             continue;
         };
         if (ret == 5) {
             // set the /dev/console as the controling terminal
             const TIOCSCTTY: u32 = 0x540E;
-            _ = os.setsid();
-            _ = os.ioctl(fd.handle, TIOCSCTTY, 0);
+            _ = try wrapErrno(os.ioctl(fd.handle, TIOCSCTTY, 0));
 
             log.info("/dev/console sucsses", .{});
             return;
         } else {
-            log.debug("fail only {} bytes write on 5", .{ret});
+            log.debug("Fail only {} bytes write on 5", .{ret});
         }
     }
     log.info("/dev/console open fail", .{});

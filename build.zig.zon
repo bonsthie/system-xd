@@ -1,0 +1,18 @@
+.{
+    .name = "userspace-digressions",
+    .version = "0.1.0",
+
+    .dependencies = .{
+        .network = .{
+            .url = "https://github.com/MasterQ32/zig-network/archive/8db1aa2f5efdf1e2ff6dd5f5f8efe1b4f44ff978.tar.gz",
+            .hash = "12203ae90636504172540e6e0feb2881affd82768af6f0a379cb84a3f70b53705fe5",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}

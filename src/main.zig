@@ -5,6 +5,7 @@ const fs = std.fs;
 const consts = @import("consts.zig");
 const customLogFn = @import("log.zig").customLogFn;
 const errno = @import("errno.zig");
+const network = @import("network");
 
 const init = @import("init.zig");
 
@@ -48,6 +49,8 @@ pub fn main() !void {
             return;
         }
     }
+
+    log.info("got da network {}", .{network});
 
     {
         const project = consts.Project;

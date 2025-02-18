@@ -113,6 +113,8 @@ pub fn build(b: *Build) void {
         .root_source_file = b.path(ENTRY_FILE),
         .target = b.resolveTargetQuery(target),
     });
+    const network = b.dependency("network", .{});
+    exe.root_module.addImport("network", network.module("network"));
     b.installArtifact(exe);
 
     const kbuild = buildKernelSteps(b);
