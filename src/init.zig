@@ -21,18 +21,28 @@ fn noop(_: *InitSystem) !void {
 fn createConsole(_: *InitSystem) !void {
     const fs = std.fs.cwd();
 
-    for (0..100) |_| {
-        log.debug("rhaaa\n", .{});
+    for (0..100) |i| {
+        log.debug("test {}", .{i});
 
-        const fd = try fs.openFile("/dev/console", .{});
+        const fd = fs.openFile("/dev/console", .{ .mode = .read_write }) catch |err| {
+            log.info("/dev/console open fail : {}", .{err});
+            continue;
+        };
         defer fd.close();
 
         _ = try wrapErrno(os.dup2(fd.handle, 0));
         _ = try wrapErrno(os.dup2(fd.handle, 1));
-        _ = try wrapErrno(os.dup2(fd.handle, 2));
+        // _ = try wrapErrno(os.dup2(fd.handle, 2));
 
-        if (os.write(1, "\x00\x00\x00\x00\n", 5) == 5) {
+        const ret = wrapErrno(os.write(1, "\x00\x00\x00\x00\n", 5)) catch |err| {
+            log.debug("write fail {}", .{err});
+            continue;
+        };
+        if (ret == 5) {
+            log.debug("/dev/console sucsses", .{});
             return;
+        } else {
+            log.debug("write {} bytes", .{ret});
         }
     }
 }
@@ -52,6 +62,11 @@ fn disableCADSyskey(_: *InitSystem) !void {
 /// This includes: `/dev`, `/proc`, `/sys`, `/run`, `/tmp`.
 fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
     const slog = std.log.scoped(.mount);
+    const paths = .{ "/dev", "/proc", "/sys", "/run", "/tmp", "/var" };
+    inline for (paths) |path| {
+        try std.fs.cwd().makePath(path);
+    }
+
     const mounts = .{
         .{ "dev", "/dev", "devtmpfs", 0, 0 },
         .{ "proc", "/proc", "proc", 0, 0 },
@@ -59,14 +74,9 @@ fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
         .{ "tmpfs", "/tmp", "tmpfs", 0, 0 },
         .{ "run", "/run", "tmpfs", 0, 0 },
         .{ "none", "/sys/kernel/debug", "debugfs", 0, 0 },
-
         //TODO: check if we need cgroups?
         // .{ "none", "/sys/fs/cgroup", "tmpfs", 0, null },
     };
-
-    inline for (mounts) |mount| {
-        try std.fs.cwd().makePath(mount[1]);
-    }
     inline for (mounts) |mount| {
         slog.debug("+ Mounting {s}", .{mount[1]});
         _ = try wrapErrno(os.mount(mount[0], mount[1], mount[2], mount[3], mount[4]));
@@ -122,7 +132,7 @@ pub fn cowabunga() !void {
     // log.debug("Parsed kernel args: {}", .{args});
 
     const steps = .{
-        // .{ .msg = "Creation of a console", .func = &createConsole },
+        .{ .msg = "Creation of a console", .func = &createConsole },
         .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
         .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
         .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },

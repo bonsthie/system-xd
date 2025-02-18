@@ -1,6 +1,6 @@
 const os = @import("std").os.linux;
 
-pub fn wrapErrno(err: anytype) anyerror!@TypeOf(err) {
+pub fn wrapErrno(err: usize) anyerror!usize {
     return switch (os.E.init(err)) {
         os.E.SUCCESS => @as(usize, 0),
         os.E.PERM => error.NoPermission,
