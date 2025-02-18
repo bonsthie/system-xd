@@ -2,6 +2,16 @@
 
 set -euo pipefail
 
+function log() {
+	echo "*> $*"
+}
+
+DIRECTORY="$(dirname "$0")"
+if [ "$DIRECTORY" != "." ]; then
+	log "Wrong directory detected, moving to $DIRECTORY"
+	cd $DIRECTORY
+fi
+
 ### fsck.ext4
 
 EXEC="e2fsck"
@@ -26,9 +36,9 @@ if [ ! -f $EXEC ]; then
 	cp $DIRNAME/build/$EXEC/$EXEC $EXEC
 	rm -rf $DIRNAME
 
-	echo "e2fsck built"
+	log "e2fsck built"
 else
-	echo "e2fsck already built"
+	log "e2fsck already built"
 fi
 
 
@@ -52,7 +62,7 @@ if [ ! -f $EXEC ]; then
 	cp $DIRNAME/src/$EXEC $EXEC 
 	rm -rf $DIRNAME
 
-	echo "fsck.fat built"
+	log "fsck.fat built"
 else
-	echo "fsck.fat already built"
+	log "fsck.fat already built"
 fi

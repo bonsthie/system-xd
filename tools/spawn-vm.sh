@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 
-ALPINE_URL="https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64/alpine-virt-3.21.2-x86_64.iso"
-ALPINE_FILE="alpine-virt-3.21.2-x86_64.iso"
-DISTRO_BOOT="$(pwd)/.distro"
-
 function log() {
 	echo "*> $@"
 }
+
+DIRECTORY="$(dirname "$0")"
+if [ "$DIRECTORY" != "." ]; then
+	log "Wrong directory detected, moving to $DIRECTORY"
+	cd $DIRECTORY
+fi
+
+ALPINE_URL="https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64/alpine-virt-3.21.2-x86_64.iso"
+ALPINE_FILE="alpine-virt-3.21.2-x86_64.iso"
+DISTRO_BOOT="$(pwd)/.distro"
 
 if [ ! -d $DISTRO_BOOT ]; then
 	if [ ! -f $ALPINE_FILE ]; then
@@ -43,7 +49,9 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 	fi
 
 	log "Building system-xd"
+	cd ..
 	zig build || exit
+	cd tools
 
 	log "Copying ramfs to $RAMFS_GEN"
 	rm -rf $RAMFS_GEN
@@ -51,7 +59,7 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 
 	log "Replacing init"
 	rm -vrf $RAMFS_GEN/init
-	cp -v zig-out/bin/init $RAMFS_GEN/init
+	cp -v ../zig-out/bin/init $RAMFS_GEN/init
 	NEW_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
 
 	if [ "$OLD_HASH" != "$NEW_HASH" ]; then
@@ -100,12 +108,11 @@ fi
 log "Launching qemu"
 # i have no idea what "sane" boot params are so i'm gonna guess this is gonna work and nobody is gonna bother actually checking any other configuration
 
-# CMDLINE="console=ttyS0" 
-CMDLINE="modules=loop,squashfs,sd-mod,usb-storage console=ttyS0 init=/bin/sh"
+CMDLINE="modules=loop,squashfs,sd-mod,usb-storage console=ttyS0"
 
 INITRAMFS_BOOT=${INITRAMFS_BOOT:-$INITRAMFS_GEN}
 GRAPHICS=${GRAPHICS:-0}
-echo $CMDLINE
+# echo $CMDLINE
 if [ $GRAPHICS -eq 1 ]; then
     log "qemu graphics version"
     qemu-system-x86_64 \
@@ -122,7 +129,6 @@ else
         -initrd $INITRAMFS_BOOT \
         -drive file=$ALPINE_FILE,format=raw,index=0 \
         -append "modules=loop,squashfs,sd-mod,usb-storage" \
-        -append "init=/bin/sh" \
         -nographic \
         -append "$CMDLINE" && reset
 fi
