@@ -16,6 +16,7 @@ in
     flex
     bison
     valgrind
+    mount
     cpio
     libarchive
     elfutils
@@ -23,6 +24,10 @@ in
     openssl
     pkg-config
     gcc
+    gettext
+    libtool
+    automake
+    autoconf
     zig-unstable
   ];
 # vim: ts=2 sw=2 et
