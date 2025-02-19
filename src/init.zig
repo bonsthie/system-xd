@@ -6,6 +6,7 @@ const wrapErrno = @import("errno.zig").wrapErrno;
 const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
 const argsModule = @import("args.zig");
+const tty = @import("process.zig");
 const parseKernelArgs = argsModule.parseKernelArgs;
 const deinitKernelArgs = argsModule.deinitKernelArgs;
 
@@ -19,38 +20,13 @@ fn noop(_: *InitSystem) !void {
 }
 
 fn createConsole(_: *InitSystem) !void {
-    const fs = std.fs.cwd();
-
     for (1..100) |i| {
         log.debug("Open /dev/console try [{}]", .{i});
-
-        const fd = fs.openFile("/dev/console", .{ .mode = .read_write }) catch |err| {
-            log.debug("/dev/console open fail : {}", .{err});
-            std.time.sleep(std.time.ns_per_s * 0.01);
-            continue;
+        _ = tty.newTTY("/dev/console", .read_write) catch |err| {
+            log.debug("createConsole error {}", .{err});
         };
-        defer fd.close();
-
-        _ = try wrapErrno(os.dup2(fd.handle, os.STDIN_FILENO));
-        _ = try wrapErrno(os.dup2(fd.handle, os.STDOUT_FILENO));
-        _ = try wrapErrno(os.dup2(fd.handle, os.STDERR_FILENO));
-
-        const ret = wrapErrno(os.write(1, "\x00\x00\x00\x00\n", 5)) catch |err| {
-            log.debug("Write fail {}", .{err});
-            continue;
-        };
-        if (ret == 5) {
-            // set the /dev/console as the controling terminal
-            const TIOCSCTTY: u32 = 0x540E;
-            _ = try wrapErrno(os.ioctl(fd.handle, TIOCSCTTY, 0));
-
-            log.info("/dev/console sucsses", .{});
-            return;
-        } else {
-            log.debug("Fail only {} bytes write on 5", .{ret});
-        }
     }
-    log.info("/dev/console open fail", .{});
+    return error.failCreateConsole;
 }
 
 /// Sets-up common signal handlers.
@@ -98,6 +74,16 @@ fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
     }
 }
 
+fn setTime(_: *InitSystem) !void {
+    const t = std.time.timestamp();
+    if (t > 0) {
+        std.log.info("time : {}", .{t});
+        return;
+    }
+    std.log.info("time is not set", .{});
+    std.log.info("setting default time", .{});
+}
+
 fn parseKernelArguments(system: *InitSystem) !void {
     system.args = parseKernelArgs(system.allocator) catch |err| {
         log.err("Failed to parse kernel args: {s}", .{@errorName(err)});
@@ -116,6 +102,15 @@ fn parseKernelArguments(system: *InitSystem) !void {
 
 fn dumpFs(_: *InitSystem) !void {
     try dbg.dumpFilesystemTree(null);
+}
+
+fn createTTY(_: *InitSystem) !void {
+    _ = try tty.spawnProcess(.{ .filename = "/dev/tty0" });
+    _ = try tty.spawnProcess(.{ .filename = "/dev/tty1" });
+    _ = try tty.spawnProcess(.{ .filename = "/dev/tty2" });
+    _ = try tty.spawnProcess(.{ .filename = "/dev/tty3" });
+    _ = try tty.spawnProcess(.{ .filename = "/dev/tty4" });
+    _ = try tty.spawnProcess(.{ .filename = "/dev/tty5" });
 }
 
 /// The true "main" function, which is where all the init stuff happens.
@@ -138,16 +133,17 @@ pub fn cowabunga() !void {
     // log.debug("Parsed kernel args: {}", .{args});
 
     const steps = .{
-        .{ .msg = "Creation of a console", .func = &createConsole },
         .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
         .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
         .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
         .{ .msg = "Parse kernel arguments", .func = &parseKernelArguments },
+        .{ .msg = "Set time", .func = &setTime },
         .{ .msg = "Integrity check fsroot", .func = &noop },
         .{ .msg = "Mount fsroot and chroot", .func = &noop },
         .{ .msg = "Mount user filesystems", .func = &noop },
         .{ .msg = "Start xd.aemon", .func = &noop },
-        .{ .msg = "Open tty's and login", .func = &noop },
+        .{ .msg = "Open tty's and login", .func = &createTTY },
+        // .{ .msg = "Creation of a console", .func = &createConsole },
     };
 
     inline for (steps) |step| {
