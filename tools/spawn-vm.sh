@@ -108,20 +108,15 @@ fi
 log "Launching qemu"
 # i have no idea what "sane" boot params are so i'm gonna guess this is gonna work and nobody is gonna bother actually checking any other configuration
 
-<<<<<<< HEAD:test.sh
 # CMDLINE_TTY="console=ttyS0" 
 CMDLINE_TTY="modules=loop,squashfs,sd-mod,usb-storage console=ttyS0 init=/bin/sh"
 
 INITRAMFS_BOOT=${INITRAMFS_BOOT:-$INITRAMFS_GEN}
 GRAPHICS=${GRAPHICS:-0}
-echo $CMDLINE_TTY
-=======
-CMDLINE="modules=loop,squashfs,sd-mod,usb-storage console=ttyS0"
 
 INITRAMFS_BOOT=${INITRAMFS_BOOT:-$INITRAMFS_GEN}
 GRAPHICS=${GRAPHICS:-0}
 # echo $CMDLINE
->>>>>>> refs/remotes/origin/main:tools/spawn-vm.sh
 if [ $GRAPHICS -eq 1 ]; then
     log "qemu graphics version"
 	qemu-system-x86_64 \
@@ -137,10 +132,7 @@ else
         -kernel $DISTRO_BOOT/vmlinuz-virt \
         -initrd $INITRAMFS_BOOT \
         -drive file=$ALPINE_FILE,format=raw,index=0 \
-<<<<<<< HEAD:test.sh
-=======
         -append "modules=loop,squashfs,sd-mod,usb-storage" \
->>>>>>> refs/remotes/origin/main:tools/spawn-vm.sh
         -nographic \
         -append "$CMDLINE_TTY" && reset
 fi

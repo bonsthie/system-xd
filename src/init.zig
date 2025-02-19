@@ -6,7 +6,7 @@ const wrapErrno = @import("errno.zig").wrapErrno;
 const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
 const argsModule = @import("args.zig");
-const tty = @import("process.zig");
+const process = @import("process.zig");
 const parseKernelArgs = argsModule.parseKernelArgs;
 const deinitKernelArgs = argsModule.deinitKernelArgs;
 
@@ -22,7 +22,7 @@ fn noop(_: *InitSystem) !void {
 fn createConsole(_: *InitSystem) !void {
     for (1..100) |i| {
         log.debug("Open /dev/console try [{}]", .{i});
-        _ = tty.newTTY("/dev/console", .read_write) catch |err| {
+        _ = process.newTTYFromName("/dev/console", .read_write) catch |err| {
             log.debug("createConsole error {}", .{err});
         };
     }
@@ -105,12 +105,12 @@ fn dumpFs(_: *InitSystem) !void {
 }
 
 fn createTTY(_: *InitSystem) !void {
-    _ = try tty.spawnProcess(.{ .filename = "/dev/tty0" });
-    _ = try tty.spawnProcess(.{ .filename = "/dev/tty1" });
-    _ = try tty.spawnProcess(.{ .filename = "/dev/tty2" });
-    _ = try tty.spawnProcess(.{ .filename = "/dev/tty3" });
-    _ = try tty.spawnProcess(.{ .filename = "/dev/tty4" });
-    _ = try tty.spawnProcess(.{ .filename = "/dev/tty5" });
+    _ = try process.spawnProcess(.{ .filename = "/dev/tty0" });
+    _ = try process.spawnProcess(.{ .filename = "/dev/tty1" });
+    _ = try process.spawnProcess(.{ .filename = "/dev/tty2" });
+    _ = try process.spawnProcess(.{ .filename = "/dev/tty3" });
+    _ = try process.spawnProcess(.{ .filename = "/dev/tty4" });
+    _ = try process.spawnProcess(.{ .filename = "/dev/tty5" });
 }
 
 /// The true "main" function, which is where all the init stuff happens.
