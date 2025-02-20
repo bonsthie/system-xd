@@ -1,8 +1,9 @@
 //! The init system.
 const std = @import("std");
+const zos = @import("os/linux.zig");
 const os = std.os.linux;
 const consts = @import("consts.zig");
-const wrapErrno = @import("errno.zig").wrapErrno;
+const wrapErrno = @import("os/errno.zig").wrapErrno;
 const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
 const argsModule = @import("args.zig");
@@ -61,7 +62,7 @@ fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
     };
     inline for (mounts) |mount| {
         slog.debug("+ Mounting {s}", .{mount[1]});
-        _ = try wrapErrno(os.mount(mount[0], mount[1], mount[2], mount[3], mount[4]));
+        try zos.mount(mount[0], mount[1], mount[2], mount[3], mount[4]);
     }
 
     const symlinkPaths = .{
@@ -70,7 +71,7 @@ fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
     };
     inline for (symlinkPaths) |symlink| {
         slog.debug("+ Linking {s} to target {s}", .{ symlink[1], symlink[0] });
-        _ = try wrapErrno(os.symlink(symlink[0], symlink[1]));
+        try zos.symlink(symlink[0], symlink[1]);
     }
 }
 
@@ -105,8 +106,7 @@ fn dumpFs(_: *InitSystem) !void {
 }
 
 fn createTTY(_: *InitSystem) !void {
-    _ = try process.spawnProcess(.{ .filename = "/dev/tty0" });
-    _ = try process.spawnProcess(.{ .filename = "/dev/tty1" });
+    // _ = try process.spawnProcess(.{ .filename = "/dev/tty1" });
     _ = try process.spawnProcess(.{ .filename = "/dev/tty2" });
     _ = try process.spawnProcess(.{ .filename = "/dev/tty3" });
     _ = try process.spawnProcess(.{ .filename = "/dev/tty4" });

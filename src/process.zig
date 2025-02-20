@@ -1,10 +1,11 @@
 const std = @import("std");
 const log = std.log.scoped(.tty);
 const os = std.os.linux;
+const zos = @import("os/linux.zig");
 const fs = std.fs;
 const OpenMode = fs.File.OpenMode;
 
-const wrapErrno = @import("errno.zig").wrapErrno;
+const wrapErrno = @import("os/errno.zig").wrapErrno;
 
 pub const Error = error{
     WriteFuncFailedWriteTTY,
@@ -42,15 +43,13 @@ fn writeTestTTY(fd: i32) !void {
 pub fn newTTY(fd: i32, mode: OpenMode) !i32 {
     log.debug("dup {}", .{mode});
     if (mode == .read_only or mode == .read_write) {
-        log.debug("read", .{});
-        _ = try wrapErrno(os.dup2(fd, os.STDIN_FILENO));
+        try zos.dup2(fd, os.STDIN_FILENO);
     }
 
     if (mode == .write_only or mode == .read_write) {
-        log.debug("write", .{});
-        _ = try wrapErrno(os.dup2(fd, os.STDOUT_FILENO));
+        try zos.dup2(fd, os.STDOUT_FILENO);
         try writeTestTTY(os.STDOUT_FILENO);
-        _ = try wrapErrno(os.dup2(fd, os.STDERR_FILENO));
+        try zos.dup2(fd, os.STDERR_FILENO);
         try writeTestTTY(os.STDERR_FILENO);
     }
 
@@ -106,7 +105,7 @@ pub fn spawnProcess(
         const command = config.command orelse getDefaultCommand();
         const args = config.args orelse getDefaultArgs();
         const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
-        _ = try wrapErrno(os.execve(command, args, envp));
+        try zos.execve(command, args, envp);
         os.exit(1);
     }
     return pid;
