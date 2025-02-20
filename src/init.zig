@@ -113,8 +113,31 @@ fn createTTY(_: *InitSystem) !void {
     _ = try process.spawnProcess(.{ .filename = "/dev/tty5" });
 }
 
+const Step = struct {
+    msg: []const u8, //
+    func: *const fn (_: *InitSystem) anyerror!void,
+};
+
+pub const phase1Steps = [_]Step{
+    .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
+    .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
+    .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
+    .{ .msg = "Parse kernel arguments", .func = &parseKernelArguments },
+    .{ .msg = "Set time", .func = &setTime },
+    .{ .msg = "Integrity check fsroot", .func = &noop },
+    .{ .msg = "Mount fsroot and chroot", .func = &noop },
+    .{ .msg = "execute the second part of the init system", .func = &noop },
+};
+
+pub const phase2Steps = [_]Step{
+    .{ .msg = "Mount user filesystems", .func = &noop },
+    .{ .msg = "Start xd.aemon", .func = &noop },
+    .{ .msg = "Open tty's and login", .func = &createTTY }, // will be xd.eamon
+    // .{ .msg = "Creation of a console", .func = &createConsole },
+};
+
 /// The true "main" function, which is where all the init stuff happens.
-pub fn cowabunga() !void {
+pub fn cowabunga(steps: []const Step) anyerror {
     _ = os.setsid();
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -132,21 +155,7 @@ pub fn cowabunga() !void {
     // defer deinitKernelArgs(&args);
     // log.debug("Parsed kernel args: {}", .{args});
 
-    const steps = .{
-        .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
-        .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
-        .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
-        .{ .msg = "Parse kernel arguments", .func = &parseKernelArguments },
-        .{ .msg = "Set time", .func = &setTime },
-        .{ .msg = "Integrity check fsroot", .func = &noop },
-        .{ .msg = "Mount fsroot and chroot", .func = &noop },
-        .{ .msg = "Mount user filesystems", .func = &noop },
-        .{ .msg = "Start xd.aemon", .func = &noop },
-        .{ .msg = "Open tty's and login", .func = &createTTY },
-        // .{ .msg = "Creation of a console", .func = &createConsole },
-    };
-
-    inline for (steps) |step| {
+    for (steps) |step| {
         log.info("+ Running {s}", .{step.msg});
         const before = std.time.milliTimestamp();
 

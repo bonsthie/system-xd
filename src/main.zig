@@ -6,6 +6,7 @@ const consts = @import("consts.zig");
 const network = @import("network");
 const header = @import("format/header.zig");
 const init = @import("init.zig");
+const debug = @import("debug.zig");
 
 const customLogFn = @import("log.zig").customLogFn;
 
@@ -25,27 +26,27 @@ fn emergencyShell() void {
     _ = os.reboot(.MAGIC1, .MAGIC2, .RESTART, null);
 }
 
-fn isPid1() !void {
-    const pid = os.getpid();
-    log.debug("PID: {d}", .{pid});
-    if (pid != 1) {
-        if (consts.debug) {
-            log.debug("Bypassing PID check because program was compiled in debug mode", .{});
-        } else {
-            log.err("This program must be run as PID 1", .{});
-            return error.notPid1;
-        }
-    }
+fn isFirstPhase() bool {
+    var args = std.process.args();
+    defer args.deinit();
+    _ = args.skip();
+    return !args.skip();
 }
 
 pub fn main() !void {
-    header.printHeader(.main);
-    try isPid1();
-    log.info("got da network {}", .{network});
+    var err: anyerror = error.noError;
 
-    init.cowabunga() catch |err| {
-        log.err("Caught an unexpected error: {s}", .{@errorName(err)});
-        log.err("Dropping you in an emergency shell, you're on your own...", .{});
-        emergencyShell();
-    };
+    if (isFirstPhase()) {
+        header.printHeader(.main);
+        try debug.isPid1();
+        log.info("got da network {}", .{network});
+
+        err = init.cowabunga(&init.phase1Steps);
+    } else {
+        err = init.cowabunga(&init.phase2Steps);
+    }
+
+    log.err("Caught an unexpected error: {s}", .{@errorName(err)});
+    log.err("Dropping you in an emergency shell, you're on your own...", .{});
+    emergencyShell();
 }

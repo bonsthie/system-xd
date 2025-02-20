@@ -1,4 +1,5 @@
 const std = @import("std");
+const os = std.os.linux;
 const consts = @import("consts.zig");
 const log = std.log.scoped(.debug);
 const fs = std.fs;
@@ -39,5 +40,18 @@ fn dumpFilesystemTreeImpl(dir: fs.Dir, depth: usize) !void {
         }
     } else |err| {
         log.err("Failed to iterate over directory {}: {}", .{ dir, err });
+    }
+}
+
+pub fn isPid1() !void {
+    const pid = os.getpid();
+    log.debug("PID: {d}", .{pid});
+    if (pid != 1) {
+        if (consts.debug) {
+            log.debug("Bypassing PID check because program was compiled in debug mode", .{});
+        } else {
+            log.err("This program must be run as PID 1", .{});
+            return error.notPid1;
+        }
     }
 }
