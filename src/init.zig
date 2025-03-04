@@ -1,20 +1,28 @@
 //! The init system.
 const std = @import("std");
 const zos = @import("os/linux.zig");
+const fstab = @import("os/fstab.zig");
 const os = std.os.linux;
 const consts = @import("consts.zig");
-const wrapErrno = @import("os/errno.zig").wrapErrno;
 const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
 const argsModule = @import("args.zig");
 const process = @import("process.zig");
+
+const wrapErrno = @import("os/errno.zig").wrapErrno;
 const parseKernelArgs = argsModule.parseKernelArgs;
 const deinitKernelArgs = argsModule.deinitKernelArgs;
 
 const InitSystem = struct {
     allocator: std.mem.Allocator,
     args: ?std.StringHashMap(?[]u8) = null,
+    fstab: ?fstab.Fstab = null,
 };
+
+fn deinitInitSystem(init: *InitSystem) void {
+    deinitKernelArgs(&init.args);
+    init.fstab.?.deinit();
+}
 
 fn noop(_: *InitSystem) !void {
     log.debug("@ noop", .{});
@@ -85,6 +93,10 @@ fn setTime(_: *InitSystem) !void {
     std.log.info("setting default time", .{});
 }
 
+fn parseFstab(init: *InitSystem) !void {
+    init.fstab = try fstab.loadFstabEntries(init.allocator, "/etc/fstab");
+}
+
 fn parseKernelArguments(system: *InitSystem) !void {
     system.args = parseKernelArgs(system.allocator) catch |err| {
         log.err("Failed to parse kernel args: {s}", .{@errorName(err)});
@@ -107,10 +119,10 @@ fn dumpFs(_: *InitSystem) !void {
 
 fn createTTY(_: *InitSystem) !void {
     // _ = try process.spawnProcess(.{ .filename = "/dev/tty1" });
-    _ = try process.spawnProcess(.{ .filename = "/dev/tty2" });
-    _ = try process.spawnProcess(.{ .filename = "/dev/tty3" });
-    _ = try process.spawnProcess(.{ .filename = "/dev/tty4" });
-    _ = try process.spawnProcess(.{ .filename = "/dev/tty5" });
+    _ = try process.spawnProcess(&.{ .filename = "/dev/tty2" });
+    _ = try process.spawnProcess(&.{ .filename = "/dev/tty3" });
+    _ = try process.spawnProcess(&.{ .filename = "/dev/tty4" });
+    _ = try process.spawnProcess(&.{ .filename = "/dev/tty5" });
 }
 
 const Step = struct {
@@ -124,6 +136,7 @@ pub const phase1Steps = [_]Step{
     .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
     .{ .msg = "Parse kernel arguments", .func = &parseKernelArguments },
     .{ .msg = "Set time", .func = &setTime },
+    .{ .msg = "parse fstab file", .func = &parseFstab },
     .{ .msg = "Integrity check fsroot", .func = &noop },
     .{ .msg = "Mount fsroot and chroot", .func = &noop },
     .{ .msg = "execute the second part of the init system", .func = &noop },
@@ -146,7 +159,7 @@ pub fn cowabunga(steps: []const Step) anyerror {
     const allocator = gpa.allocator();
 
     var initSystem = InitSystem{ .allocator = allocator };
-    defer deinitKernelArgs(&initSystem.args);
+    defer deinitInitSystem(&initSystem);
 
     // var args = parseKernelArgs(allocator) catch |err| {
     //     log.err("Failed to parse kernel args: {s}", .{@errorName(err)});

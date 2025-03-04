@@ -15,7 +15,10 @@ pub const std_options = .{
     .log_level = if (consts.debug) .debug else .info,
 };
 
-fn emergencyShell() void {
+fn emergencyShell(initError: anyerror) void {
+    log.err("Caught an unexpected error: {s}", .{@errorName(initError)});
+    log.err("Dropping you in an emergency shell, you're on your own...", .{});
+
     const argv = &[_:null]?[*:0]const u8{ "/bin/sh", "-i" };
     const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
 
@@ -43,10 +46,8 @@ pub fn main() !void {
 
         err = init.cowabunga(&init.phase1Steps);
     } else {
-        err = init.cowabunga(&init.phase2Steps);
+        err = init.cowabunga(&init.phase1Steps);
     }
 
-    log.err("Caught an unexpected error: {s}", .{@errorName(err)});
-    log.err("Dropping you in an emergency shell, you're on your own...", .{});
-    emergencyShell();
+    emergencyShell(err);
 }

@@ -1,5 +1,5 @@
 const std = @import("std");
-const log = std.log.scoped(.tty);
+const log = std.log.scoped(.process);
 const os = std.os.linux;
 const zos = @import("os/linux.zig");
 const fs = std.fs;
@@ -86,7 +86,7 @@ fn getDefaultArgs() [*:null]const ?[*:0]const u8 {
 }
 
 pub fn spawnProcess(
-    config: ProcessConfig,
+    config: *ProcessConfig,
 ) !usize {
     const pid = if (config.newProcess) os.fork() else 0;
 
