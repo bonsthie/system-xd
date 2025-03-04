@@ -1,55 +1,69 @@
 const std = @import("std");
+const linux = @import("linux.zig");
 const log = std.log.scoped(.fstab);
 
-pub const MountFlag = enum(u32) {
-    // "auto": The filesystem will be mounted automatically at boot or via 'mount -a'
+const MountFlags = linux.MountFlags;
+
+pub const FsMountFlag = enum(u32) {
+    // Automatic mounting at boot or via 'mount -a'
     auto = 1 << 0,
-    // "noauto": The filesystem will only be mounted on demand
+    // Mount manually (not automatically at boot)
     noauto = 1 << 1,
-    // "discard": Enables TRIM on SSDs (not recommended in some cases)
-    discard = 1 << 2,
-    // "nofail": Does not block boot if the partition is unavailable
-    nofail = 1 << 3,
-    // "rw": Mounts the filesystem in read-write mode
-    rw = 1 << 4,
-    // "ro": Mounts the filesystem in read-only mode
-    ro = 1 << 5,
-    // "relatime": Updates the atime relatively (when the file is modified)
-    relatime = 1 << 6,
-    // "noatime": Does not update the atime on inodes
-    noatime = 1 << 7,
-    // "user": Allows any user to mount (implies noexec, nosuid, nodev)
-    user = 1 << 8,
-    // "nouser": Only root can mount (default option)
-    nouser = 1 << 9,
-    // "sync": I/O operations are performed synchronously
-    sync = 1 << 10,
-    // "async": I/O operations are performed asynchronously
-    @"async" = 1 << 11,
-    // "suid": Allows suid and sgid bits (to temporarily elevate privileges)
-    suid = 1 << 12,
-    // "nosuid": Blocks suid and sgid bits
-    nosuid = 1 << 13,
-    // "exec": Allows execution of binaries on the partition
-    exec = 1 << 14,
-    // "noexec": Prevents execution of binaries
-    noexec = 1 << 15,
-    // "dev": Interprets special files (devices) on the partition
-    dev = 1 << 16,
-    // "acl": Enables ACL management
-    acl = 1 << 17,
+    // Does not block boot if mount fails
+    nofail = 1 << 2,
+    // Allow any user to mount (implies noexec, nosuid, nodev)
+    user = 1 << 3,
+    // Only root can mount (default)
+    nouser = 1 << 4,
+    // Label-based mounting (e.g., LABEL=, UUID= in fstab)
+    label = 1 << 5,
+    // Use PARTUUID for mounting
+    partuuid = 1 << 6,
+    // Use PARTLABEL for mounting
+    partlabel = 1 << 7,
 };
 
-pub const DefaultMountFlags: u32 = @intFromEnum(MountFlag.rw) //
-| @intFromEnum(MountFlag.suid) //
-| @intFromEnum(MountFlag.dev) //
-| @intFromEnum(MountFlag.exec) //
-| @intFromEnum(MountFlag.auto) //
-| @intFromEnum(MountFlag.nouser) //
-| @intFromEnum(MountFlag.@"async");
+pub const mountFlagsMap = std.ComptimeStringMap(MountFlags, .{
+    .{ "ro", MountFlags.MS_RDONLY },
+    .{ "rw", 0 }, // Default
+    .{ "suid", 0 }, // Default
+    .{ "exec", 0 }, // Default
+    .{ "async", 0 }, // Default
+    .{ "nosuid", MountFlags.MS_NOSUID },
+    .{ "nodev", MountFlags.MS_NODEV },
+    .{ "noexec", MountFlags.MS_NOEXEC },
+    .{ "sync", MountFlags.MS_SYNCHRONOUS },
+    .{ "remount", MountFlags.MS_REMOUNT },
+    .{ "mandlock", MountFlags.MS_MANDLOCK },
+    .{ "write", MountFlags.S_WRITE },
+    .{ "append", MountFlags.S_APPEND },
+    .{ "immutable", MountFlags.S_IMMUTABLE },
+    .{ "noatime", MountFlags.MS_NOATIME },
+    .{ "nodiratime", MountFlags.MS_NODIRATIME },
+    .{ "bind", MountFlags.MS_BIND },
+});
+
+pub const DefaultFsFlags: u32 = @intFromEnum(FsMountFlag.auto) //
+| @intFromEnum(FsMountFlag.nouser);
+
+pub const FsFlagsMap = std.ComptimeStringMap(MountFlags, .{
+    .{ "default", DefaultFsFlags },
+    .{ "auto", FsMountFlag.auto },
+    .{ "noauto", FsMountFlag.noauto },
+    .{ "nofail", FsMountFlag.nofail },
+    .{ "user", FsMountFlag.user },
+    .{ "nouser", FsMountFlag.nouser },
+    .{ "label", FsMountFlag.label },
+    .{ "partuuid", FsMountFlag.partuuid },
+    .{ "partlabel", FsMountFlag.partlabel },
+});
+
+// The "defaults" option corresponds to: rw, suid, dev, exec, auto, nouser, async.
+pub const DefaultMountFlags: u32 = 0;
 
 pub const MountOptions = struct {
-    flags: u32 = DefaultMountFlags,
+    mountFlags: u32 = DefaultMountFlags,
+    flags: u32 = DefaultFsFlags,
     vers: f32 = 4.0,
     sec: []const u8 = "krb5",
     rsize: u32 = 65536,
@@ -86,6 +100,10 @@ pub const Fstab = struct {
     }
 };
 
+fn parseMountOptions(_: []const u8) MountOptions {
+    return MountOptions{};
+}
+
 // fstab entry line pattern :
 // <file system> <mount point>   <type>  <options>       <dump>  <pass>
 fn initFstabEntry(allocator: std.mem.Allocator, line: []const u8) !FstabEntry {
@@ -99,8 +117,7 @@ fn initFstabEntry(allocator: std.mem.Allocator, line: []const u8) !FstabEntry {
     errdefer allocator.free(new.mount_point);
     new.fstype = try allocator.dupe(u8, it.next() orelse return error.fstabInvalidFormating);
     errdefer allocator.free(new.fstype);
-    _ = it.next();
-    new.mount_opts = MountOptions{}; // need to parse elem;
+    new.mount_opts = parseMountOptions(it.next() orelse return error.fstabInvalidFormating);
     new.dump = std.fmt.parseInt(u32, it.next() orelse return error.fstabInvalidFormating, 10) catch 0;
     new.pass = std.fmt.parseInt(u32, it.next() orelse return error.fstabInvalidFormating, 10) catch 0;
 
@@ -130,6 +147,9 @@ pub fn loadFstabEntries(allocator: std.mem.Allocator, filename: []const u8) !Fst
             if (err == error.EndOfStream) break;
             return err;
         };
+        if (buffer.items[0] == '#') {
+            continue;
+        }
         log.debug("line {s}", .{buffer.items});
         const entry = try initFstabEntry(allocator, buffer.items);
         try fstab.entries.append(entry);
