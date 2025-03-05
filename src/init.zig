@@ -145,8 +145,8 @@ pub const phase1Steps = [_]Step{
 pub const phase2Steps = [_]Step{
     .{ .msg = "parse fstab", .func = &parseFstab },
     .{ .msg = "Mount user filesystems", .func = &noop },
-    .{ .msg = "Start xd.aemon", .func = &noop },
     .{ .msg = "Open tty's and login", .func = &createTTY }, // will be xd.eamon
+    .{ .msg = "Start xd.aemon", .func = &noop },
     // .{ .msg = "Creation of a console", .func = &createConsole },
 };
 

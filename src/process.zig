@@ -86,7 +86,7 @@ fn getDefaultArgs() [*:null]const ?[*:0]const u8 {
 }
 
 pub fn spawnProcess(
-    config: *ProcessConfig,
+    config: *const ProcessConfig,
 ) !usize {
     const pid = if (config.newProcess) os.fork() else 0;
 

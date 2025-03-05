@@ -104,8 +104,8 @@ pub fn debugFsOptions(options: FsOptions) void {
     std.debug.print("Mount Flags set: ", .{});
     var printed = false;
     inline for (MountFlagsData) |item| {
-        if (item.value != 0 and (options.mountFlags & item.value) != 0) {
-            std.debug.print("{s} ", .{item.key});
+        if (item[1] != 0 and (options.mountFlags & item[1]) != 0) {
+            std.debug.print("{s} ", .{item[0]});
             printed = true;
         }
     }
@@ -118,14 +118,11 @@ pub fn debugFsOptions(options: FsOptions) void {
     std.debug.print("Filesystem Flags set: ", .{});
     printed = false;
     inline for (FsFlagsData) |item| {
-        if ((options.flags & item.value) != 0) {
-            std.debug.print("{s} ", .{item.key});
-            printed = true;
+        if (options.flags != 0 and ((options.flags & item[1]) != 0)) {
+            std.debug.print("{s} ", .{item[0]});
         }
     }
-    if (!printed) {
-        std.debug.print("none", .{});
-    }
+
     std.debug.print("\n==================================\n", .{});
 }
 
@@ -196,6 +193,9 @@ fn initFstabEntry(allocator: std.mem.Allocator, line: []const u8) !FstabEntry {
     return new;
 }
 
+//---------------------------------------------------------------------
+// small fstab parser
+// (maybe rm the file name and check if getenv("FSTAB_FILE") exist)
 pub fn loadFstabEntries(allocator: std.mem.Allocator, filename: []const u8) !Fstab {
     const fd = std.fs.cwd().openFile(filename, .{}) catch |err| {
         log.debug("{s} open fail : {}", .{ filename, err });
