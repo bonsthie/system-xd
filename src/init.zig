@@ -136,13 +136,14 @@ pub const phase1Steps = [_]Step{
     .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
     .{ .msg = "Parse kernel arguments", .func = &parseKernelArguments },
     .{ .msg = "Set time", .func = &setTime },
-    .{ .msg = "parse fstab file", .func = &parseFstab },
+    .{ .msg = "parse initramfs fstab", .func = &parseFstab },
     .{ .msg = "Integrity check fsroot", .func = &noop },
     .{ .msg = "Mount fsroot and chroot", .func = &noop },
     .{ .msg = "execute the second part of the init system", .func = &noop },
 };
 
 pub const phase2Steps = [_]Step{
+    .{ .msg = "parse fstab", .func = &parseFstab },
     .{ .msg = "Mount user filesystems", .func = &noop },
     .{ .msg = "Start xd.aemon", .func = &noop },
     .{ .msg = "Open tty's and login", .func = &createTTY }, // will be xd.eamon

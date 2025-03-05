@@ -10,7 +10,7 @@ const debug = @import("debug.zig");
 
 const customLogFn = @import("log.zig").customLogFn;
 
-pub const std_options = .{
+pub const std_options = std.Options{
     .logFn = customLogFn,
     .log_level = if (consts.debug) .debug else .info,
 };

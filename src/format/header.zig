@@ -25,7 +25,7 @@ pub fn coerceProjectAuthors() []const u8 {
     return result;
 }
 
-pub fn printHeader(comptime scope: @Type(.EnumLiteral)) void {
+pub fn printHeader(comptime scope: @Type(.enum_literal)) void {
     const p = log.scoped(scope);
     const project = consts.Project;
     p.info("Launching {s} v{s}", .{ project.name, project.version });

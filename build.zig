@@ -7,7 +7,7 @@ const SRC_DIR = "src/";
 const ENTRY_FILE = SRC_DIR ++ "main.zig";
 const NAME = "init";
 
-const target = .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .none };
+const target: std.Target.Query = .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .none };
 
 pub fn build(b: *Build) void {
     const network = b.dependency("network", .{});

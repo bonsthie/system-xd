@@ -23,47 +23,48 @@ pub const FsMountFlag = enum(u32) {
     partlabel = 1 << 7,
 };
 
-pub const mountFlagsMap = std.ComptimeStringMap(MountFlags, .{
-    .{ "ro", MountFlags.MS_RDONLY },
+pub const mountFlagsMap = std.StaticStringMap(u32).initComptime(.{
+    .{ "ro", @intFromEnum(MountFlags.MS_RDONLY) },
     .{ "rw", 0 }, // Default
     .{ "suid", 0 }, // Default
     .{ "exec", 0 }, // Default
     .{ "async", 0 }, // Default
-    .{ "nosuid", MountFlags.MS_NOSUID },
-    .{ "nodev", MountFlags.MS_NODEV },
-    .{ "noexec", MountFlags.MS_NOEXEC },
-    .{ "sync", MountFlags.MS_SYNCHRONOUS },
-    .{ "remount", MountFlags.MS_REMOUNT },
-    .{ "mandlock", MountFlags.MS_MANDLOCK },
-    .{ "write", MountFlags.S_WRITE },
-    .{ "append", MountFlags.S_APPEND },
-    .{ "immutable", MountFlags.S_IMMUTABLE },
-    .{ "noatime", MountFlags.MS_NOATIME },
-    .{ "nodiratime", MountFlags.MS_NODIRATIME },
-    .{ "bind", MountFlags.MS_BIND },
+    .{ "nosuid", @intFromEnum(MountFlags.MS_NOSUID) },
+    .{ "nodev", @intFromEnum(MountFlags.MS_NODEV) },
+    .{ "noexec", @intFromEnum(MountFlags.MS_NOEXEC) },
+    .{ "sync", @intFromEnum(MountFlags.MS_SYNCHRONOUS) },
+    .{ "remount", @intFromEnum(MountFlags.MS_REMOUNT) },
+    .{ "mandlock", @intFromEnum(MountFlags.MS_MANDLOCK) },
+    .{ "write", @intFromEnum(MountFlags.S_WRITE) },
+    .{ "append", @intFromEnum(MountFlags.S_APPEND) },
+    .{ "immutable", @intFromEnum(MountFlags.S_IMMUTABLE) },
+    .{ "noatime", @intFromEnum(MountFlags.MS_NOATIME) },
+    .{ "nodiratime", @intFromEnum(MountFlags.MS_NODIRATIME) },
+    .{ "bind", @intFromEnum(MountFlags.MS_BIND) },
 });
 
 pub const DefaultFsFlags: u32 = @intFromEnum(FsMountFlag.auto) //
 | @intFromEnum(FsMountFlag.nouser);
 
-pub const FsFlagsMap = std.ComptimeStringMap(MountFlags, .{
+pub const FsFlagsMap = std.StaticStringMap(u32).initComptime(.{
     .{ "default", DefaultFsFlags },
-    .{ "auto", FsMountFlag.auto },
-    .{ "noauto", FsMountFlag.noauto },
-    .{ "nofail", FsMountFlag.nofail },
-    .{ "user", FsMountFlag.user },
-    .{ "nouser", FsMountFlag.nouser },
-    .{ "label", FsMountFlag.label },
-    .{ "partuuid", FsMountFlag.partuuid },
-    .{ "partlabel", FsMountFlag.partlabel },
+    .{ "auto", @intFromEnum(FsMountFlag.auto) },
+    .{ "noauto", @intFromEnum(FsMountFlag.noauto) },
+    .{ "nofail", @intFromEnum(FsMountFlag.nofail) },
+    .{ "user", @intFromEnum(FsMountFlag.user) },
+    .{ "nouser", @intFromEnum(FsMountFlag.nouser) },
+    .{ "label", @intFromEnum(FsMountFlag.label) },
+    .{ "partuuid", @intFromEnum(FsMountFlag.partuuid) },
+    .{ "partlabel", @intFromEnum(FsMountFlag.partlabel) },
 });
 
 // The "defaults" option corresponds to: rw, suid, dev, exec, auto, nouser, async.
 pub const DefaultMountFlags: u32 = 0;
 
-pub const MountOptions = struct {
+pub const FsOptions = struct {
     mountFlags: u32 = DefaultMountFlags,
     flags: u32 = DefaultFsFlags,
+
     vers: f32 = 4.0,
     sec: []const u8 = "krb5",
     rsize: u32 = 65536,
@@ -73,8 +74,8 @@ pub const MountOptions = struct {
 pub const FstabEntry = struct {
     device: []const u8,
     mount_point: []const u8,
+    options: FsOptions,
     fstype: []const u8,
-    mount_opts: MountOptions,
     dump: u32,
     pass: u32,
 };
@@ -100,8 +101,27 @@ pub const Fstab = struct {
     }
 };
 
-fn parseMountOptions(_: []const u8) MountOptions {
-    return MountOptions{};
+fn updateMountOption(mo: *FsOptions, option: []const u8) void {
+    log.debug("mount option [{s}]", .{option});
+    if (mountFlagsMap.get(option)) |opt| {
+        mo.mountFlags |= opt;
+    } else if (FsFlagsMap.get(option)) |opt| {
+        mo.flags |= opt;
+    } else {
+        // do fsentry with args
+        log.debug("not found", .{});
+    }
+}
+
+fn parseMountOptions(options: []const u8) FsOptions {
+    var mo = FsOptions{};
+
+    var it = std.mem.tokenizeAny(u8, options, ",");
+    while (it.next()) |opt| {
+        updateMountOption(&mo, opt);
+    }
+
+    return mo;
 }
 
 // fstab entry line pattern :
