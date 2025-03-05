@@ -1,34 +1,31 @@
-const std = @import("std");
 const linux = @import("linux.zig");
 const log = std.log.scoped(.fstab);
 
 const MountFlags = linux.MountFlags;
 
+const std = @import("std");
+
+//---------------------------------------------------------------------
+// Enum for filesystem mount flags.
 pub const FsMountFlag = enum(u32) {
-    // Automatic mounting at boot or via 'mount -a'
-    auto = 1 << 0,
-    // Mount manually (not automatically at boot)
-    noauto = 1 << 1,
-    // Does not block boot if mount fails
-    nofail = 1 << 2,
-    // Allow any user to mount (implies noexec, nosuid, nodev)
-    user = 1 << 3,
-    // Only root can mount (default)
-    nouser = 1 << 4,
-    // Label-based mounting (e.g., LABEL=, UUID= in fstab)
-    label = 1 << 5,
-    // Use PARTUUID for mounting
-    partuuid = 1 << 6,
-    // Use PARTLABEL for mounting
-    partlabel = 1 << 7,
+    auto = 1 << 0, // Automatic mounting at boot or via 'mount -a'
+    noauto = 1 << 1, // Mount manually (not automatically at boot)
+    nofail = 1 << 2, // Does not block boot if mount fails
+    user = 1 << 3, // Allow any user to mount (implies noexec, nosuid, nodev)
+    nouser = 1 << 4, // Only root can mount (default)
+    label = 1 << 5, // Label-based mounting (e.g., LABEL=, UUID= in fstab)
+    partuuid = 1 << 6, // Use PARTUUID for mounting
+    partlabel = 1 << 7, // Use PARTLABEL for mounting
 };
 
-pub const mountFlagsMap = std.StaticStringMap(u32).initComptime(.{
-    .{ "ro", @intFromEnum(MountFlags.MS_RDONLY) },
-    .{ "rw", 0 }, // Default
+//---------------------------------------------------------------------
+// Data for Mount Flags map.
+const MountFlagsData = .{
     .{ "suid", 0 }, // Default
     .{ "exec", 0 }, // Default
     .{ "async", 0 }, // Default
+    .{ "rw", 0 }, // Default
+    .{ "ro", @intFromEnum(MountFlags.MS_RDONLY) },
     .{ "nosuid", @intFromEnum(MountFlags.MS_NOSUID) },
     .{ "nodev", @intFromEnum(MountFlags.MS_NODEV) },
     .{ "noexec", @intFromEnum(MountFlags.MS_NOEXEC) },
@@ -41,12 +38,13 @@ pub const mountFlagsMap = std.StaticStringMap(u32).initComptime(.{
     .{ "noatime", @intFromEnum(MountFlags.MS_NOATIME) },
     .{ "nodiratime", @intFromEnum(MountFlags.MS_NODIRATIME) },
     .{ "bind", @intFromEnum(MountFlags.MS_BIND) },
-});
+};
 
-pub const DefaultFsFlags: u32 = @intFromEnum(FsMountFlag.auto) //
-| @intFromEnum(FsMountFlag.nouser);
+pub const MountFlagsMap = std.StaticStringMap(u32).initComptime(MountFlagsData);
 
-pub const FsFlagsMap = std.StaticStringMap(u32).initComptime(.{
+//---------------------------------------------------------------------
+// Data for Filesystem Flags map.
+const FsFlagsData = .{
     .{ "default", DefaultFsFlags },
     .{ "auto", @intFromEnum(FsMountFlag.auto) },
     .{ "noauto", @intFromEnum(FsMountFlag.noauto) },
@@ -56,24 +54,25 @@ pub const FsFlagsMap = std.StaticStringMap(u32).initComptime(.{
     .{ "label", @intFromEnum(FsMountFlag.label) },
     .{ "partuuid", @intFromEnum(FsMountFlag.partuuid) },
     .{ "partlabel", @intFromEnum(FsMountFlag.partlabel) },
-});
+};
 
-// The "defaults" option corresponds to: rw, suid, dev, exec, auto, nouser, async.
+pub const FsFlagsMap = std.StaticStringMap(u32).initComptime(FsFlagsData);
+
+//---------------------------------------------------------------------
+// Default flag values.
 pub const DefaultMountFlags: u32 = 0;
+pub const DefaultFsFlags: u32 = @intFromEnum(FsMountFlag.auto) | @intFromEnum(FsMountFlag.nouser);
 
+//---------------------------------------------------------------------
+// Structures representing filesystem options and fstab entries.
 pub const FsOptions = struct {
     mountFlags: u32 = DefaultMountFlags,
     flags: u32 = DefaultFsFlags,
-
-    vers: f32 = 4.0,
-    sec: []const u8 = "krb5",
-    rsize: u32 = 65536,
-    wsize: u32 = 65536,
 };
 
 pub const FstabEntry = struct {
     device: []const u8,
-    mount_point: []const u8,
+    mount_options: []const u8,
     options: FsOptions,
     fstype: []const u8,
     dump: u32,
@@ -87,29 +86,82 @@ pub const Fstab = struct {
     pub fn deinit(self: *Fstab) void {
         for (self.entries.items) |entry| {
             self.allocator.free(entry.device);
-            self.allocator.free(entry.mount_point);
+            self.allocator.free(entry.mount_options);
             self.allocator.free(entry.fstype);
         }
         self.entries.deinit();
     }
-
-    pub fn print(self: *Fstab) void {
-        for (self.entries.items) |entry| {
-            log.debug("device {s}", .{entry.device});
-            log.debug("mountpoint {s}", .{entry.mount_point});
-        }
-    }
 };
 
+//---------------------------------------------------------------------
+// Debug printing for filesystem options using our compile-time arrays.
+pub fn debugFsOptions(options: FsOptions) void {
+    std.debug.print("==== Filesystem Options Debug ====\n", .{});
+    std.debug.print("Mount Flags (raw): 0x{X}\n", .{options.mountFlags});
+    std.debug.print("Filesystem Flags (raw): 0x{X}\n", .{options.flags});
+
+    // Print mount flags set.
+    std.debug.print("Mount Flags set: ", .{});
+    var printed = false;
+    inline for (MountFlagsData) |item| {
+        if (item.value != 0 and (options.mountFlags & item.value) != 0) {
+            std.debug.print("{s} ", .{item.key});
+            printed = true;
+        }
+    }
+    if (!printed) {
+        std.debug.print("none", .{});
+    }
+    std.debug.print("\n", .{});
+
+    // Print filesystem flags set.
+    std.debug.print("Filesystem Flags set: ", .{});
+    printed = false;
+    inline for (FsFlagsData) |item| {
+        if ((options.flags & item.value) != 0) {
+            std.debug.print("{s} ", .{item.key});
+            printed = true;
+        }
+    }
+    if (!printed) {
+        std.debug.print("none", .{});
+    }
+    std.debug.print("\n==================================\n", .{});
+}
+
+//---------------------------------------------------------------------
+// Debug printing for an fstab entry.
+pub fn debugFstabEntry(entry: FstabEntry) void {
+    std.debug.print("==== FstabEntry Debug ====\n", .{});
+    std.debug.print("Device: {s}\n", .{entry.device});
+    std.debug.print("Mount Point: {s}\n", .{entry.mount_options});
+    std.debug.print("Filesystem Type: {s}\n", .{entry.fstype});
+    std.debug.print("Dump: {d}\n", .{entry.dump});
+    std.debug.print("Pass: {d}\n", .{entry.pass});
+    debugFsOptions(entry.options);
+    std.debug.print("==== End of FstabEntry Debug ====\n", .{});
+}
+
+//---------------------------------------------------------------------
+// Debug printing for the entire fstab.
+pub fn debugFstab(fstab: Fstab) void {
+    if (fstab.entries.items.len == 0) {
+        std.debug.print("Fstab is empty\n", .{});
+        return;
+    }
+    for (fstab.entries.items) |entry| {
+        debugFstabEntry(entry);
+    }
+}
+
+//---------------------------------------------------------------------
+// Example function to update mount options from a string.
 fn updateMountOption(mo: *FsOptions, option: []const u8) void {
-    log.debug("mount option [{s}]", .{option});
-    if (mountFlagsMap.get(option)) |opt| {
+    std.debug.print("mount option [{s}]\n", .{option});
+    if (MountFlagsMap.get(option)) |opt| {
         mo.mountFlags |= opt;
     } else if (FsFlagsMap.get(option)) |opt| {
         mo.flags |= opt;
-    } else {
-        // do fsentry with args
-        log.debug("not found", .{});
     }
 }
 
@@ -133,11 +185,11 @@ fn initFstabEntry(allocator: std.mem.Allocator, line: []const u8) !FstabEntry {
 
     new.device = try allocator.dupe(u8, it.next() orelse return error.fstabInvalidFormating);
     errdefer allocator.free(new.device);
-    new.mount_point = try allocator.dupe(u8, it.next() orelse return error.fstabInvalidFormating);
-    errdefer allocator.free(new.mount_point);
+    new.mount_options = try allocator.dupe(u8, it.next() orelse return error.fstabInvalidFormating);
+    errdefer allocator.free(new.mount_options);
     new.fstype = try allocator.dupe(u8, it.next() orelse return error.fstabInvalidFormating);
     errdefer allocator.free(new.fstype);
-    new.mount_opts = parseMountOptions(it.next() orelse return error.fstabInvalidFormating);
+    new.options = parseMountOptions(it.next() orelse return error.fstabInvalidFormating);
     new.dump = std.fmt.parseInt(u32, it.next() orelse return error.fstabInvalidFormating, 10) catch 0;
     new.pass = std.fmt.parseInt(u32, it.next() orelse return error.fstabInvalidFormating, 10) catch 0;
 
@@ -174,6 +226,6 @@ pub fn loadFstabEntries(allocator: std.mem.Allocator, filename: []const u8) !Fst
         const entry = try initFstabEntry(allocator, buffer.items);
         try fstab.entries.append(entry);
     }
-    fstab.print();
+    debugFstab(fstab);
     return fstab;
 }
