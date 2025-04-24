@@ -1,5 +1,6 @@
 .{
-    .name = "userspace-digressions",
+    .name = .userspace_digressions,
+    .fingerprint = 0x652c1c7aff583525,
     .version = "0.1.0",
 
     .dependencies = .{

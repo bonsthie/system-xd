@@ -4,13 +4,12 @@ const os = std.os.linux;
 const zos = @import("os/linux.zig");
 const consts = @import("consts.zig");
 const network = @import("network");
+const customLogFn = @import("log.zig").customLogFn;
 const header = @import("format/header.zig");
 const init = @import("init.zig");
 const debug = @import("debug.zig");
 
-const customLogFn = @import("log.zig").customLogFn;
-
-pub const std_options = std.Options{
+pub const std_options: std.Options = .{
     .logFn = customLogFn,
     .log_level = if (consts.debug) .debug else .info,
 };
