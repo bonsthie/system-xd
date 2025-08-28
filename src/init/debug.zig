@@ -3,7 +3,7 @@ const os = std.os.linux;
 const log = std.log.scoped(.debug);
 const fs = std.fs;
 
-const consts = @import("consts.zig");
+const consts = @import("xd").consts; 
 
 pub fn dumpFilesystemTree(path: ?[]const u8) !void {
     if (path) |p| {

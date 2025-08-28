@@ -8,7 +8,7 @@ const log = std.log.scoped(.init);
 const argsModule = @import("args.zig");
 const process = @import("process.zig");
 
-const consts = @import("consts.zig");
+const consts = @import("xd").consts;
 
 const wrapErrno = @import("os/errno.zig").wrapErrno;
 const parseKernelArgs = argsModule.parseKernelArgs;

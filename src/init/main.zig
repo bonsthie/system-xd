@@ -2,13 +2,10 @@ const std = @import("std");
 const log = std.log.scoped(.main);
 const os = std.os.linux;
 const zos = @import("os/linux.zig");
-const consts = @import("consts.zig");
-const network = @import("network");
 const init = @import("init.zig");
 const debug = @import("debug.zig");
 
-const header = @import("format/header.zig");
-const _ = @import("log.zig");
+const format = @import("xd").format;
 
 fn emergencyShell(initError: anyerror) void {
     log.err("Caught an unexpected error: {s}", .{@errorName(initError)});
@@ -31,11 +28,13 @@ fn isFirstPhase() bool {
     return !args.skip();
 }
 
+const network = @import("network");
+
 pub fn main() !void {
     var err: anyerror = error.noError;
 
     if (isFirstPhase()) {
-        header.printHeader(.main);
+        format.header.printHeader(.main);
         try debug.isPid1();
 
         log.info("got da network {}", .{network});

@@ -7,7 +7,7 @@ pub fn parseKernelArgs(allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
     const file = try std.fs.openFileAbsolute("/proc/cmdline", .{});
     defer file.close();
 
-    const contents = try file.reader().readAllAlloc(allocator, 32 * 1024);
+    const contents = try file.deprecatedReader().readAllAlloc(allocator, 32 * 1024);
     defer allocator.free(contents);
 
     var it = std.mem.tokenizeAny(u8, contents, " \t\n\r");

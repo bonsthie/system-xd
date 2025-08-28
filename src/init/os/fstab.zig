@@ -212,7 +212,7 @@ pub fn loadFstabEntries(allocator: std.mem.Allocator, filename: []const u8) !Fst
     };
     errdefer fstab.deinit();
 
-    const in_stream = fd.reader();
+    const in_stream = fd.deprecatedReader();
     while (true) {
         buffer.clearRetainingCapacity();
         in_stream.streamUntilDelimiter(buffer.writer(), '\n', null) catch |err| {
