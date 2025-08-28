@@ -1,8 +1,9 @@
 const std = @import("std");
 const os = std.os.linux;
-const consts = @import("consts.zig");
 const log = std.log.scoped(.debug);
 const fs = std.fs;
+
+const consts = @import("consts.zig");
 
 pub fn dumpFilesystemTree(path: ?[]const u8) !void {
     if (path) |p| {

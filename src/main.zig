@@ -4,15 +4,11 @@ const os = std.os.linux;
 const zos = @import("os/linux.zig");
 const consts = @import("consts.zig");
 const network = @import("network");
-const customLogFn = @import("log.zig").customLogFn;
-const header = @import("format/header.zig");
 const init = @import("init.zig");
 const debug = @import("debug.zig");
 
-pub const std_options: std.Options = .{
-    .logFn = customLogFn,
-    .log_level = if (consts.debug) .debug else .info,
-};
+const header = @import("format/header.zig");
+const _ = @import("log.zig");
 
 fn emergencyShell(initError: anyerror) void {
     log.err("Caught an unexpected error: {s}", .{@errorName(initError)});
@@ -41,6 +37,7 @@ pub fn main() !void {
     if (isFirstPhase()) {
         header.printHeader(.main);
         try debug.isPid1();
+
         log.info("got da network {}", .{network});
 
         err = init.cowabunga(&init.phase1Steps);

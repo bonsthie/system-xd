@@ -5,6 +5,6 @@ pub const debug = (builtin.mode == .Debug);
 
 pub const Project = .{
     .name = "system-xd",
-    .version = "0.0.1+indev",
+    .version = "0.1.0+indev",
     .authors = [_][]const u8{ "babonnet", "kiroussa" },
 };

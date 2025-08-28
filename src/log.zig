@@ -1,5 +1,11 @@
 const std = @import("std");
 const log = std.log;
+const consts = @import("consts.zig");
+
+pub const std_options: std.Options = .{
+    .logFn = customLogFn,
+    .log_level = if (consts.debug) .debug else .info,
+};
 
 pub fn customLogFn(
     comptime level: log.Level,

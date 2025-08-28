@@ -3,11 +3,12 @@ const std = @import("std");
 const zos = @import("os/linux.zig");
 const fstab = @import("os/fstab.zig");
 const os = std.os.linux;
-const consts = @import("consts.zig");
 const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
 const argsModule = @import("args.zig");
 const process = @import("process.zig");
+
+const consts = @import("consts.zig");
 
 const wrapErrno = @import("os/errno.zig").wrapErrno;
 const parseKernelArgs = argsModule.parseKernelArgs;
