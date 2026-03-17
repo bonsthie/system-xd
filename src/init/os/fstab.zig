@@ -80,10 +80,10 @@ pub const FstabEntry = struct {
 };
 
 pub const Fstab = struct {
-    entries: std.ArrayList(FstabEntry),
+    entries: std.array_list.Managed(FstabEntry),
     allocator: std.mem.Allocator,
 
-    pub fn deinit(self: *Fstab) void {
+    pub fn deinit(self: *const Fstab) void {
         for (self.entries.items) |entry| {
             self.allocator.free(entry.device);
             self.allocator.free(entry.mount_options);
@@ -203,11 +203,11 @@ pub fn loadFstabEntries(allocator: std.mem.Allocator, filename: []const u8) !Fst
     };
     defer fd.close();
 
-    var buffer = std.ArrayList(u8).init(allocator);
+    var buffer = std.array_list.Managed(u8).init(allocator);
     defer buffer.deinit();
 
     var fstab = Fstab{
-        .entries = std.ArrayList(FstabEntry).init(allocator),
+        .entries = std.array_list.Managed(FstabEntry).init(allocator),
         .allocator = allocator,
     };
     errdefer fstab.deinit();
@@ -219,10 +219,10 @@ pub fn loadFstabEntries(allocator: std.mem.Allocator, filename: []const u8) !Fst
             if (err == error.EndOfStream) break;
             return err;
         };
-        if (buffer.items[0] == '#') {
+        log.debug("line {s}", .{buffer.items});
+        if (buffer.items.len == 0 or buffer.items[0] == '#') {
             continue;
         }
-        log.debug("line {s}", .{buffer.items});
         const entry = try initFstabEntry(allocator, buffer.items);
         try fstab.entries.append(entry);
     }

@@ -53,6 +53,7 @@ pub fn build(b: *Build) void {
             .optimize = optimize,
             .imports = imports,
         }),
+        .linkage = .dynamic,
     });
     b.installArtifact(cli);
 }

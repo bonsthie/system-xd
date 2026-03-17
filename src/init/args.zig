@@ -3,6 +3,14 @@ const log = std.log.scoped(.args);
 
 pub fn parseKernelArgs(allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
     var map = std.StringHashMap(?[]u8).init(allocator);
+    errdefer {
+        var it = map.iterator();
+        while (it.next()) |entry| {
+            allocator.free(entry.key_ptr.*);
+            if (entry.value_ptr.*) |v| allocator.free(v);
+        }
+        map.deinit();
+    }
 
     const file = try std.fs.openFileAbsolute("/proc/cmdline", .{});
     defer file.close();
@@ -13,29 +21,21 @@ pub fn parseKernelArgs(allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
     var it = std.mem.tokenizeAny(u8, contents, " \t\n\r");
     while (it.next()) |arg| {
         if (arg.len == 0) continue;
-        // log.debug("Found thing at {s}", .{arg});
-        const eq = std.mem.indexOfScalar(u8, arg, '=') orelse {
-            // log.debug("Found no = at {s}", .{arg});
-            const allocated_arg = try allocator.dupe(u8, arg);
-            // log.debug("Arg: {*}", .{&allocated_arg});
-            map.put(allocated_arg, null) catch |err| {
-                deinitWrapOptional(map);
-                return err;
-            };
-            continue;
-        };
-        // log.debug("Found = at {d}", .{eq});
-        const key = arg[0..eq];
-        const allocated_key = try allocator.dupe(u8, key);
-        // log.debug("Key: {*}", .{&allocated_key});
-        const val = arg[eq + 1 ..];
-        const allocated_val = try allocator.dupe(u8, val);
-        // log.debug("Val: {*}", .{&allocated_val});
-        // log.debug("Parsed kernel arg: {s}={s}", .{ allocated_key, allocated_val });
-        map.put(allocated_key, allocated_val) catch |err| {
-            deinitWrapOptional(map);
-            return err;
-        };
+
+        const raw_key, const raw_val = if (std.mem.indexOfScalar(u8, arg, '=')) |eq|
+            .{ arg[0..eq], @as(?[]const u8, arg[eq + 1 ..]) }
+        else
+            .{ arg, @as(?[]const u8, null) };
+
+        const allocated_key = try allocator.dupe(u8, raw_key);
+        const gop = try map.getOrPut(allocated_key);
+
+        if (gop.found_existing) {
+            allocator.free(allocated_key);
+            if (gop.value_ptr.*) |old_val| allocator.free(old_val);
+        }
+
+        gop.value_ptr.* = if (raw_val) |v| try allocator.dupe(u8, v) else null;
     }
 
     return map;

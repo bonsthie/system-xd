@@ -22,7 +22,9 @@ const InitSystem = struct {
 
 fn deinitInitSystem(init: *InitSystem) void {
     deinitKernelArgs(&init.args);
-    init.fstab.?.deinit();
+    if (init.fstab) |fs| {
+        fs.deinit();
+    }
 }
 
 fn noop(_: *InitSystem) !void {
@@ -65,7 +67,7 @@ fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
         .{ "sys", "/sys", "sysfs", 0, 0 },
         .{ "tmpfs", "/tmp", "tmpfs", 0, 0 },
         .{ "run", "/run", "tmpfs", 0, 0 },
-        .{ "none", "/sys/kernel/debug", "debugfs", 0, 0 },
+        // .{ "none", "/sys/kernel/debug", "debugfs", 0, 0 },
         //TODO: check if we need cgroups?
         // .{ "none", "/sys/fs/cgroup", "tmpfs", 0, null },
     };
