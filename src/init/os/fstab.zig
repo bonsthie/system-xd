@@ -89,7 +89,7 @@ pub const Fstab = struct {
             self.allocator.free(entry.mount_options);
             self.allocator.free(entry.fstype);
         }
-        self.entries.deinit();
+        self.entries.deinit(self.allocator);
     }
 };
 
@@ -196,26 +196,26 @@ fn initFstabEntry(allocator: std.mem.Allocator, line: []const u8) !FstabEntry {
 //---------------------------------------------------------------------
 // small fstab parser
 // (maybe rm the file name and check if getenv("FSTAB_FILE") exist)
-pub fn loadFstabEntries(allocator: std.mem.Allocator, filename: []const u8) !Fstab {
-    const fd = std.fs.cwd().openFile(filename, .{}) catch |err| {
+pub fn loadFstabEntries(init: *InitSystem, filename: []const u8) !Fstab {
+    const fd = std.Io.Dir.openFileAbsolute(init.io, filename, .{}) catch |err| {
         log.debug("{s} open fail : {}", .{ filename, err });
         return error.EntriesFileOpenFail;
     };
     defer fd.close();
 
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
+    var buffer = std.ArrayList(u8).initCapacity(init.allocator, 8196) catch unreachable;
+    defer buffer.deinit(init.allocator);
 
-    var fstab = Fstab{
-        .entries = std.ArrayList(FstabEntry).init(allocator),
-        .allocator = allocator,
+    var fstab = Fstab {
+        .entries = std.ArrayList(FstabEntry).initCapacity(init.allocator, 10) catch unreachable,
+        .allocator = init.allocator,
     };
     errdefer fstab.deinit();
 
     const in_stream = fd.deprecatedReader();
     while (true) {
         buffer.clearRetainingCapacity();
-        in_stream.streamUntilDelimiter(buffer.writer(), '\n', null) catch |err| {
+        in_stream.streamUntilDelimiter(buffer.writer(init.allocator), '\n', null) catch |err| {
             if (err == error.EndOfStream) break;
             return err;
         };
@@ -223,8 +223,8 @@ pub fn loadFstabEntries(allocator: std.mem.Allocator, filename: []const u8) !Fst
             continue;
         }
         log.debug("line {s}", .{buffer.items});
-        const entry = try initFstabEntry(allocator, buffer.items);
-        try fstab.entries.append(entry);
+        const entry = try initFstabEntry(init.allocator, buffer.items);
+        try fstab.entries.append(init.allocator, entry);
     }
     debugFstab(fstab);
     return fstab;

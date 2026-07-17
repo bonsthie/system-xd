@@ -16,6 +16,7 @@ const deinitKernelArgs = argsModule.deinitKernelArgs;
 
 const InitSystem = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     args: ?std.StringHashMap(?[]u8) = null,
     fstab: ?fstab.Fstab = null,
 };
@@ -52,11 +53,11 @@ fn disableCADSyskey(_: *InitSystem) !void {
 /// Creates and mounts the common kernel-related filesystems.
 ///
 /// This includes: `/dev`, `/proc`, `/sys`, `/run`, `/tmp`.
-fn mountKernelVirtualFileSystems(_: *InitSystem) !void {
+fn mountKernelVirtualFileSystems(init: *InitSystem) !void {
     const slog = std.log.scoped(.mount);
     const paths = .{ "/dev", "/proc", "/sys", "/run", "/tmp", "/var" };
     inline for (paths) |path| {
-        try std.fs.cwd().makePath(path);
+        try std.Io.Dir.createDirAbsolute(init.io, path, .{});
     }
 
     const mounts = .{
@@ -95,11 +96,11 @@ fn setTime(_: *InitSystem) !void {
 }
 
 fn parseFstab(init: *InitSystem) !void {
-    init.fstab = try fstab.loadFstabEntries(init.allocator, "/etc/fstab");
+    init.fstab = try fstab.loadFstabEntries(init, "/etc/fstab");
 }
 
 fn parseKernelArguments(system: *InitSystem) !void {
-    system.args = parseKernelArgs(system.allocator) catch |err| {
+    system.args = parseKernelArgs(system.io, system.allocator) catch |err| {
         log.err("Failed to parse kernel args: {s}", .{@errorName(err)});
         return err;
     };
@@ -152,15 +153,10 @@ pub const phase2Steps = [_]Step{
 };
 
 /// The true "main" function, which is where all the init stuff happens.
-pub fn cowabunga(steps: []const Step) anyerror {
+pub fn cowabunga(steps: []const Step, io: std.Io, allocator: std.mem.Allocator) anyerror {
     _ = os.setsid();
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
-    const allocator = gpa.allocator();
-
-    var initSystem = InitSystem{ .allocator = allocator };
+    var initSystem = InitSystem{ .allocator = allocator, .io = io };
     defer deinitInitSystem(&initSystem);
 
     // var args = parseKernelArgs(allocator) catch |err| {

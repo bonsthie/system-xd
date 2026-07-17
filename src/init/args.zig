@@ -1,10 +1,10 @@
 const std = @import("std");
 const log = std.log.scoped(.args);
 
-pub fn parseKernelArgs(allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
+pub fn parseKernelArgs(io: std.Io, allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
     var map = std.StringHashMap(?[]u8).init(allocator);
 
-    const file = try std.fs.openFileAbsolute("/proc/cmdline", .{});
+    const file = try std.Io.Dir.openFileAbsolute(io, "/proc/cmdline", .{});
     defer file.close();
 
     const contents = try file.deprecatedReader().readAllAlloc(allocator, 32 * 1024);

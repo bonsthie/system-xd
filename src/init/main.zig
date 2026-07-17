@@ -21,27 +21,25 @@ fn emergencyShell(initError: anyerror) void {
     _ = os.reboot(.MAGIC1, .MAGIC2, .RESTART, null);
 }
 
-fn isFirstPhase() bool {
-    var args = std.process.args();
-    defer args.deinit();
-    _ = args.skip();
-    return !args.skip();
+fn isFirstPhase(proc_init: *const std.process.Init) bool {
+    const args = proc_init.minimal.args;
+    const iter = args.iterator();
+    _ = iter.skip();
+    return !iter.skip();
 }
 
 const network = @import("network");
 
-pub fn main() !void {
+pub fn main(proc_init: std.process.Init) !void {
     var err: anyerror = error.noError;
 
-    if (isFirstPhase()) {
-        format.header.printHeader(.main);
+    if (isFirstPhase(&proc_init)) {
+        format.header.printHeader();
         try debug.isPid1();
 
-        log.info("got da network {}", .{network});
-
-        err = init.cowabunga(&init.phase1Steps);
+        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.allocator);
     } else {
-        err = init.cowabunga(&init.phase1Steps);
+        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.allocator);
     }
 
     emergencyShell(err);
