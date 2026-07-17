@@ -14,7 +14,7 @@ const wrapErrno = @import("os/errno.zig").wrapErrno;
 const parseKernelArgs = argsModule.parseKernelArgs;
 const deinitKernelArgs = argsModule.deinitKernelArgs;
 
-const InitSystem = struct {
+pub const InitSystem = struct {
     allocator: std.mem.Allocator,
     io: std.Io,
     args: ?std.StringHashMap(?[]u8) = null,
@@ -57,7 +57,9 @@ fn mountKernelVirtualFileSystems(init: *InitSystem) !void {
     const slog = std.log.scoped(.mount);
     const paths = .{ "/dev", "/proc", "/sys", "/run", "/tmp", "/var" };
     inline for (paths) |path| {
-        try std.Io.Dir.createDirAbsolute(init.io, path, .{});
+        const file = try std.Io.Dir.createFileAbsolute(init.io, path, .{});
+        // we don't need to use the file
+        file.close(init.io);
     }
 
     const mounts = .{
@@ -85,9 +87,10 @@ fn mountKernelVirtualFileSystems(init: *InitSystem) !void {
     }
 }
 
-fn setTime(_: *InitSystem) !void {
-    const t = std.time.timestamp();
-    if (t > 0) {
+fn setTime(init: *InitSystem) !void {
+    const t = std.Io.Clock.now(.real, init.io);
+    if (t.toSeconds() > 0) {
+        // TODO use t.formatNumber for the print
         std.log.info("time : {}", .{t});
         return;
     }
@@ -168,7 +171,7 @@ pub fn cowabunga(steps: []const Step, io: std.Io, allocator: std.mem.Allocator) 
 
     for (steps) |step| {
         log.info("+ Running {s}", .{step.msg});
-        const before = std.time.milliTimestamp();
+        const before = std.Io.Clock.now(.real, io).toMilliseconds();
 
         step.func(&initSystem) catch |err| {
             log.err("! Caught an unexpected error: {s}" ++ (if (consts.debug) ". (debug ignore)" else ""), .{@errorName(err)});
@@ -177,7 +180,7 @@ pub fn cowabunga(steps: []const Step, io: std.Io, allocator: std.mem.Allocator) 
             }
         };
 
-        const after = std.time.milliTimestamp();
+        const after = std.Io.Clock.now(.real, io).toMilliseconds();
         log.debug("= Done in {d}ms", .{after - before});
     }
 

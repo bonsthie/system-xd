@@ -1,4 +1,5 @@
 const linux = @import("linux.zig");
+const init = @import("../init.zig");
 const log = std.log.scoped(.fstab);
 
 const MountFlags = linux.MountFlags;
@@ -196,35 +197,42 @@ fn initFstabEntry(allocator: std.mem.Allocator, line: []const u8) !FstabEntry {
 //---------------------------------------------------------------------
 // small fstab parser
 // (maybe rm the file name and check if getenv("FSTAB_FILE") exist)
-pub fn loadFstabEntries(init: *InitSystem, filename: []const u8) !Fstab {
-    const fd = std.Io.Dir.openFileAbsolute(init.io, filename, .{}) catch |err| {
+pub fn loadFstabEntries(initSystem: *init.InitSystem, filename: []const u8) !Fstab {
+    const fd = std.Io.Dir.openFileAbsolute(initSystem.io, filename, .{}) catch |err| {
         log.debug("{s} open fail : {}", .{ filename, err });
         return error.EntriesFileOpenFail;
     };
-    defer fd.close();
+    defer fd.close(initSystem.io);
 
-    var buffer = std.ArrayList(u8).initCapacity(init.allocator, 8196) catch unreachable;
-    defer buffer.deinit(init.allocator);
-
-    var fstab = Fstab {
-        .entries = std.ArrayList(FstabEntry).initCapacity(init.allocator, 10) catch unreachable,
-        .allocator = init.allocator,
+    var fstab = Fstab{
+        .entries = std.ArrayList(FstabEntry).initCapacity(initSystem.allocator, 10) catch unreachable,
+        .allocator = initSystem.allocator,
     };
     errdefer fstab.deinit();
 
-    const in_stream = fd.deprecatedReader();
+    var writer = std.Io.Writer.Allocating.initCapacity(initSystem.allocator, 8196) catch unreachable;
+    defer writer.deinit();
+
+    var in_stream = fd.reader(initSystem.io, &.{});
     while (true) {
-        buffer.clearRetainingCapacity();
-        in_stream.streamUntilDelimiter(buffer.writer(init.allocator), '\n', null) catch |err| {
-            if (err == error.EndOfStream) break;
-            return err;
+        writer.clearRetainingCapacity();
+        const reached_end = reached_end: {
+            _ = in_stream.interface.streamDelimiter(&writer.writer, '\n') catch |err| switch (err) {
+                error.EndOfStream => break :reached_end true,
+                else => return err,
+            };
+            in_stream.interface.toss(1);
+            break :reached_end false;
         };
-        if (buffer.items[0] == '#') {
-            continue;
+
+        const line = std.mem.trim(u8, writer.written(), " \t\r");
+        if (line.len != 0 and line[0] != '#') {
+            log.debug("line {s}", .{line});
+            const entry = try initFstabEntry(initSystem.allocator, line);
+            try fstab.entries.append(initSystem.allocator, entry);
         }
-        log.debug("line {s}", .{buffer.items});
-        const entry = try initFstabEntry(init.allocator, buffer.items);
-        try fstab.entries.append(init.allocator, entry);
+
+        if (reached_end) break;
     }
     debugFstab(fstab);
     return fstab;

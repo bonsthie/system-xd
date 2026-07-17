@@ -7,7 +7,7 @@ pub fn wrapErrno(err: anytype) anyerror!@TypeOf(err) {
         inline else => @bitCast(err),
     };
 
-    return switch (os.E.init(errno)) {
+    return switch (os.errno(errno)) {
         os.E.SUCCESS => err,
         os.E.PERM => error.NoPermission,
         os.E.NOENT => error.NoEntry,

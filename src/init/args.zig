@@ -5,9 +5,14 @@ pub fn parseKernelArgs(io: std.Io, allocator: std.mem.Allocator) !std.StringHash
     var map = std.StringHashMap(?[]u8).init(allocator);
 
     const file = try std.Io.Dir.openFileAbsolute(io, "/proc/cmdline", .{});
-    defer file.close();
+    defer file.close(io);
 
-    const contents = try file.deprecatedReader().readAllAlloc(allocator, 32 * 1024);
+    var file_reader = file.reader(io, &.{});
+
+    const contents = try file_reader.interface.allocRemaining(
+        allocator,
+        .limited(32 * 1024),
+    );
     defer allocator.free(contents);
 
     var it = std.mem.tokenizeAny(u8, contents, " \t\n\r");

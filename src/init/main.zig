@@ -23,7 +23,7 @@ fn emergencyShell(initError: anyerror) void {
 
 fn isFirstPhase(proc_init: *const std.process.Init) bool {
     const args = proc_init.minimal.args;
-    const iter = args.iterator();
+    var iter = args.iterate();
     _ = iter.skip();
     return !iter.skip();
 }
@@ -37,9 +37,9 @@ pub fn main(proc_init: std.process.Init) !void {
         format.header.printHeader();
         try debug.isPid1();
 
-        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.allocator);
+        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.gpa);
     } else {
-        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.allocator);
+        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.gpa);
     }
 
     emergencyShell(err);
