@@ -2,6 +2,7 @@
 const std = @import("std");
 const zos = @import("os/linux.zig");
 const fstab = @import("os/fstab.zig");
+const fsck = @import("os/fsck.zig");
 const os = std.os.linux;
 const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
@@ -23,7 +24,7 @@ pub const InitSystem = struct {
 
 fn deinitInitSystem(init: *InitSystem) void {
     deinitKernelArgs(&init.args);
-    init.fstab.?.deinit();
+    if (init.fstab) |*f| f.deinit();
 }
 
 fn noop(_: *InitSystem) !void {
@@ -123,7 +124,7 @@ fn dumpFs(_: *InitSystem) !void {
 }
 
 fn createTTY(_: *InitSystem) !void {
-    // _ = try process.spawnProcess(.{ .filename = "/dev/tty1" });
+    _ = try process.spawnProcess(&.{ .filename = "/dev/tty1" });
     _ = try process.spawnProcess(&.{ .filename = "/dev/tty2" });
     _ = try process.spawnProcess(&.{ .filename = "/dev/tty3" });
     _ = try process.spawnProcess(&.{ .filename = "/dev/tty4" });
@@ -131,7 +132,7 @@ fn createTTY(_: *InitSystem) !void {
 }
 
 const Step = struct {
-    msg: []const u8, //
+    msg: []const u8,
     func: *const fn (_: *InitSystem) anyerror!void,
 };
 
@@ -148,7 +149,7 @@ pub const phase1Steps = [_]Step{
 };
 
 pub const phase2Steps = [_]Step{
-    .{ .msg = "parse fstab", .func = &parseFstab },
+    .{ .msg = "Parse fstab", .func = &parseFstab },
     .{ .msg = "Mount user filesystems", .func = &noop },
     .{ .msg = "Open tty's and login", .func = &createTTY }, // will be xd.eamon
     .{ .msg = "Start xd.aemon", .func = &noop },

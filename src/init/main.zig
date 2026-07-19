@@ -39,7 +39,7 @@ pub fn main(proc_init: std.process.Init) !void {
 
         err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.gpa);
     } else {
-        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.gpa);
+        err = init.cowabunga(&init.phase2Steps, proc_init.io, proc_init.gpa);
     }
 
     emergencyShell(err);

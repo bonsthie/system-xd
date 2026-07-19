@@ -3,7 +3,7 @@ const log = std.log.scoped(.process);
 const os = std.os.linux;
 const zos = @import("os/linux.zig");
 const fs = std.fs;
-const OpenMode = fs.File.OpenMode;
+const OpenMode = std.Io.Dir.OpenFileOptions.Mode;
 
 const wrapErrno = @import("os/errno.zig").wrapErrno;
 
