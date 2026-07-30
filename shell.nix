@@ -2,10 +2,7 @@
   pkgs ? import <nixpkgs> {},
 }:
 
-let
-  stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.llvmPackages_22.stdenv;
-in
-(pkgs.mkShell.override { inherit stdenv; }) {
+pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
     zig
     e2tools
