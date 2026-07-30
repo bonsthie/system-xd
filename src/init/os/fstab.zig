@@ -204,7 +204,7 @@ pub fn loadFstabEntries(initSystem: *init.InitSystem, filename: []const u8) !Fst
     };
     defer fd.close(initSystem.io);
 
-    var fstab = Fstab{
+    var fstab = Fstab {
         .entries = std.ArrayList(FstabEntry).initCapacity(initSystem.allocator, 10) catch unreachable,
         .allocator = initSystem.allocator,
     };

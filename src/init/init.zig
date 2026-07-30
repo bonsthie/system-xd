@@ -40,14 +40,21 @@ fn createConsole(_: *InitSystem) !void {
     return error.failCreateConsole;
 }
 
+fn triggerReboot(sig: os.SIG) callconv(.c) void {
+    _ = sig;
+}
+
 /// Sets-up common signal handlers.
-fn setupSignalHandlers(_: *InitSystem) !void {}
+fn setupSignalHandlers(_: *InitSystem) !void {
+    _ = zos.signal(os.SIG.INT, triggerReboot) catch |err| {
+        log.err("Failed to setup SIGINT handler: {s}", .{@errorName(err)});
+    };
+}
 
 /// Disables the Ctrl-Alt-Del syskey instantly rebooting the system.
 /// Instead, it sends a SIGINT to the init process (that's us!!!).
 fn disableCADSyskey(_: *InitSystem) !void {
-    const err = os.reboot(.MAGIC1, .MAGIC2, .CAD_OFF, null);
-    _ = try wrapErrno(err);
+    _ = try wrapErrno(os.reboot(.MAGIC1, .MAGIC2, .CAD_OFF, null));
 }
 
 /// Creates and mounts the common kernel-related filesystems.

@@ -21,7 +21,9 @@ const LIBXD_NAME = "xd";
 pub fn build(b: *Build) void {
     const network = b.dependency("network", .{}).module("network");
     const target = b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .none });
-    const optimize = b.standardOptimizeOption(.{});
+    const optimize = b.standardOptimizeOption(.{
+        .preferred_optimize_mode = .Debug
+    });
 
     const libxd = b.addModule(LIBXD_NAME, .{
         .root_source_file = b.path(LIBXD_ROOT_FILE),

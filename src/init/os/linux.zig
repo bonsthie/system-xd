@@ -50,6 +50,19 @@ pub fn execve(path: [*:0]const u8, argv: [*:null]const ?[*:0]const u8, envp: [*:
     _ = try wrapErrno(linux.execve(path, argv, envp));
 }
 
-pub fn ioctl(fd: os.linux.fd_t, request: u32, arg: usize) !void {
+pub fn ioctl(fd: linux.fd_t, request: u32, arg: usize) !void {
     _ = try wrapErrno(linux.ioctl(fd, request, arg));
+}
+
+pub const SigHandlerFn = @TypeOf(@as(linux.Sigaction, undefined).handler.handler);
+
+pub fn signal(sig: linux.SIG, handler: SigHandlerFn) !SigHandlerFn {
+    const act = linux.Sigaction{
+        .handler = .{ .handler = handler },
+        .mask = std.mem.zeroes(linux.sigset_t),
+        .flags = 0,
+    };
+    var old: linux.Sigaction = undefined;
+    _ = try wrapErrno(linux.sigaction(sig, &act, &old));
+    return old.handler.handler;
 }
