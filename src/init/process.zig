@@ -62,14 +62,17 @@ pub fn newTTY(fd: i32, mode: OpenMode) !i32 {
 }
 
 pub fn newTTYFromName(file: []const u8, mode: OpenMode) !i32 {
-    const fd = fs.cwd().openFile(file, .{ .mode = mode }) catch |err| {
-        log.debug("{s} open fail : {}", .{ file, err });
-        return error.newTTYOpenFail;
-    };
-    defer if (fd.handle > 2) fd.close();
-    const ret = try newTTY(fd.handle, mode);
-    log.info("{s} is created successfully", .{file});
-    return ret;
+    _ = file;
+    _ = mode;
+    return error.newTTYFromName;
+    // const fd = fs.cwd().openFile(file, .{ .mode = mode }) catch |err| {
+    //     log.debug("{s} open fail : {}", .{ file, err });
+    //     return error.newTTYOpenFail;
+    // };
+    // defer if (fd.handle > 2) fd.close();
+    // const ret = try newTTY(fd.handle, mode);
+    // log.info("{s} is created successfully", .{file});
+    // return ret;
 }
 
 fn getDefaultCommand() [*:0]const u8 {
