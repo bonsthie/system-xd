@@ -19,7 +19,6 @@ const LIBXD_ROOT_FILE = LIBXD_DIR ++ "root.zig";
 const LIBXD_NAME = "xd";
 
 pub fn build(b: *Build) void {
-    const network = b.dependency("network", .{}).module("network");
     const target = b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .none });
     const optimize = b.standardOptimizeOption(.{
         .preferred_optimize_mode = .Debug
@@ -32,7 +31,6 @@ pub fn build(b: *Build) void {
     });
 
     const imports: []const Import = &.{
-        .{ .name = "network", .module = network },
         .{ .name = LIBXD_NAME, .module = libxd },
     };
 

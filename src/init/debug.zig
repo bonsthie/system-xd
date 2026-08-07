@@ -1,46 +1,39 @@
 const std = @import("std");
 const os = std.os.linux;
 const log = std.log.scoped(.debug);
-const fs = std.fs;
 
-const consts = @import("xd").consts; 
+const consts = @import("xd").consts;
 
-pub fn dumpFilesystemTree(path: ?[]const u8) !void {
+pub fn dumpFilesystemTree(io: std.Io, path: ?[]const u8) !void {
     if (path) |p| {
         log.info("Dumping filesystem tree at {s}", .{p});
-        var dir = try fs.openDirAbsolute(p, .{ .iterate = true });
-        defer dir.close();
-        try dumpFilesystemTreeImpl(dir, 0);
+        var dir = try std.Io.Dir.openDirAbsolute(io, p, .{ .iterate = true });
+        defer dir.close(io);
+        try dumpFilesystemTreeImpl(io, dir, 0);
     } else {
         log.info("Dumping filesystem tree at root", .{});
-        var dir = try fs.openDirAbsolute("/", .{ .iterate = true });
-        defer dir.close();
-        try dumpFilesystemTreeImpl(dir, 0);
+        var dir = try std.Io.Dir.openDirAbsolute(io, "/", .{ .iterate = true });
+        defer dir.close(io);
+        try dumpFilesystemTreeImpl(io, dir, 0);
     }
 }
 
-fn dumpFilesystemTreeImpl(dir: fs.Dir, depth: usize) !void {
+fn dumpFilesystemTreeImpl(io: std.Io, dir: std.Io.Dir, depth: usize) !void {
     var it = dir.iterate();
-    while (it.next()) |e| {
-        if (e) |entry| {
-            const name = entry.name;
-            const is_dir = entry.kind == .directory;
-            for (0..depth) |_| {
-                std.debug.print("  ", .{});
-            }
-            if (is_dir) {
-                std.debug.print("- {s}/\n", .{name});
-                var sub = try dir.openDir(name, .{ .iterate = true });
-                defer sub.close();
-                try dumpFilesystemTreeImpl(sub, depth + 1);
-            } else {
-                std.debug.print("- {s}\n", .{name});
-            }
-        } else {
-            break;
+    while (try it.next(io)) |entry| {
+        const name = entry.name;
+        const is_dir = entry.kind == .directory;
+        for (0..depth) |_| {
+            std.debug.print("  ", .{});
         }
-    } else |err| {
-        log.err("Failed to iterate over directory {}: {}", .{ dir, err });
+        if (is_dir) {
+            std.debug.print("- {s}/\n", .{name});
+            var sub = try std.Io.Dir.openDir(dir, io, name, .{ .iterate = true });
+            defer sub.close(io);
+            try dumpFilesystemTreeImpl(io, sub, depth + 1);
+        } else {
+            std.debug.print("- {s}\n", .{name});
+        }
     }
 }
 

@@ -2,10 +2,10 @@ const std = @import("std");
 const log = std.log.scoped(.process);
 const os = std.os.linux;
 const zos = @import("os/linux.zig");
-const fs = std.fs;
-const OpenMode = std.Io.Dir.OpenFileOptions.Mode;
 
 const wrapErrno = @import("os/errno.zig").wrapErrno;
+
+const OpenMode = std.Io.Dir.OpenFileOptions.Mode;
 
 pub const Error = error{
     WriteFuncFailedWriteTTY,
@@ -18,6 +18,7 @@ var loginPath: ?[*:0]const u8 = null;
 var loginArgs: ?[*:null]const ?[*:0]const u8 = null;
 
 pub const ProcessConfig = struct {
+    io: std.Io,
     command: ?[*:0]const u8 = null,
     args: ?[*:null]const ?[*:0]const u8 = null,
     mode: OpenMode = .read_write,
@@ -29,14 +30,14 @@ pub const ProcessConfig = struct {
 
 fn writeTestTTY(fd: i32) !void {
     const ret = wrapErrno(os.write(fd, "\x00\x00\x00\x00\n", 5)) catch {
-        return error.writeFuncFaildWriteTTY;
+        return error.WriteFuncFailedWriteTTY;
     };
 
     if (ret == 5) {
         return;
     } else {
         log.debug("Fail only {} bytes write on 5 in fd[{}]", .{ ret, fd });
-        return error.sizeWriteTestTTY;
+        return error.SizeWriteTestTTY;
     }
 }
 
@@ -61,18 +62,15 @@ pub fn newTTY(fd: i32, mode: OpenMode) !i32 {
     return fd;
 }
 
-pub fn newTTYFromName(file: []const u8, mode: OpenMode) !i32 {
-    _ = file;
-    _ = mode;
-    return error.newTTYFromName;
-    // const fd = fs.cwd().openFile(file, .{ .mode = mode }) catch |err| {
-    //     log.debug("{s} open fail : {}", .{ file, err });
-    //     return error.newTTYOpenFail;
-    // };
-    // defer if (fd.handle > 2) fd.close();
-    // const ret = try newTTY(fd.handle, mode);
-    // log.info("{s} is created successfully", .{file});
-    // return ret;
+pub fn newTTYFromName(io: std.Io, file: []const u8, mode: OpenMode) !i32 {
+    const fd_file = std.Io.Dir.openFileAbsolute(io, file, .{ .mode = mode }) catch |err| {
+        log.debug("{s} open fail : {}", .{ file, err });
+        return error.NewTTYOpenFail;
+    };
+    defer if (fd_file.handle > 2) fd_file.close(io);
+    const ret = try newTTY(fd_file.handle, mode);
+    log.info("{s} is created successfully", .{file});
+    return ret;
 }
 
 fn getDefaultCommand() [*:0]const u8 {
@@ -88,9 +86,7 @@ fn getDefaultArgs() [*:null]const ?[*:0]const u8 {
     return loginArgs.?;
 }
 
-pub fn spawnProcess(
-    config: *const ProcessConfig,
-) !usize {
+pub fn spawnProcess(config: *const ProcessConfig) !usize {
     const pid = if (config.newProcess) os.fork() else 0;
 
     if (pid < -1) {
@@ -101,7 +97,7 @@ pub fn spawnProcess(
         if (config.fd != 0) {
             _ = try newTTY(config.fd, config.mode);
         } else {
-            _ = try newTTYFromName(config.filename.?, config.mode);
+            _ = try newTTYFromName(config.io, config.filename.?, config.mode);
         }
         // TODO set term attribute ?
 

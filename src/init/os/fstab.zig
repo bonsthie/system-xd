@@ -194,6 +194,43 @@ fn initFstabEntry(allocator: std.mem.Allocator, line: []const u8) !FstabEntry {
     return new;
 }
 
+pub fn findRootEntry(fstab_entries: *const Fstab) ?FstabEntry {
+    for (fstab_entries.entries.items) |entry| {
+        if (std.mem.eql(u8, entry.mount_options, "/")) return entry;
+    }
+    return null;
+}
+
+pub fn shouldAutoMount(entry: FstabEntry) bool {
+    if (std.mem.eql(u8, entry.fstype, "swap")) return false;
+    if (entry.options.flags & @intFromEnum(FsMountFlag.noauto) != 0) return false;
+    return true;
+}
+
+pub fn resolveDeviceSpec(allocator: std.mem.Allocator, spec: []const u8) ![]u8 {
+    if (spec.len != 0 and spec[0] == '/')
+        return allocator.dupe(u8, spec);
+    if (std.mem.startsWith(u8, spec, "UUID="))
+        return std.fmt.allocPrint(allocator, "/dev/disk/by-uuid/{s}", .{spec[5..]});
+    if (std.mem.startsWith(u8, spec, "PARTUUID="))
+        return std.fmt.allocPrint(allocator, "/dev/disk/by-partuuid/{s}", .{spec[9..]});
+    if (std.mem.startsWith(u8, spec, "LABEL="))
+        return std.fmt.allocPrint(allocator, "/dev/disk/by-label/{s}", .{spec[6..]});
+    return allocator.dupe(u8, spec);
+}
+
+pub fn mountEntry(allocator: std.mem.Allocator, io: std.Io, entry: FstabEntry) !void {
+    const device_z = try allocator.dupeZ(u8, entry.device);
+    defer allocator.free(device_z);
+    const mount_z = try allocator.dupeZ(u8, entry.mount_options);
+    defer allocator.free(mount_z);
+    const fstype_z = try allocator.dupeZ(u8, entry.fstype);
+    defer allocator.free(fstype_z);
+
+    try std.Io.Dir.createDirPath(.cwd(), io, entry.mount_options);
+    try linux.mount(device_z, mount_z, fstype_z, entry.options.mountFlags, 0);
+}
+
 //---------------------------------------------------------------------
 // small fstab parser
 // (maybe rm the file name and check if getenv("FSTAB_FILE") exist)
@@ -210,29 +247,23 @@ pub fn loadFstabEntries(initSystem: *init.InitSystem, filename: []const u8) !Fst
     };
     errdefer fstab.deinit();
 
-    var writer = std.Io.Writer.Allocating.initCapacity(initSystem.allocator, 8196) catch unreachable;
-    defer writer.deinit();
+    var read_buffer: [4096]u8 = undefined;
+    var file_reader = fd.reader(initSystem.io, &read_buffer);
 
-    var in_stream = fd.reader(initSystem.io, &.{});
-    while (true) {
-        writer.clearRetainingCapacity();
-        const reached_end = reached_end: {
-            _ = in_stream.interface.streamDelimiter(&writer.writer, '\n') catch |err| switch (err) {
-                error.EndOfStream => break :reached_end true,
-                else => return err,
-            };
-            in_stream.interface.toss(1);
-            break :reached_end false;
-        };
+    const contents = try file_reader.interface.allocRemaining(
+        initSystem.allocator,
+        .limited(1024 * 1024),
+    );
+    defer initSystem.allocator.free(contents);
 
-        const line = std.mem.trim(u8, writer.written(), " \t\r");
+    var lines = std.mem.splitScalar(u8, contents, '\n');
+    while (lines.next()) |line_raw| {
+        const line = std.mem.trim(u8, line_raw, " \t\r");
         if (line.len != 0 and line[0] != '#') {
             log.debug("line {s}", .{line});
             const entry = try initFstabEntry(initSystem.allocator, line);
             try fstab.entries.append(initSystem.allocator, entry);
         }
-
-        if (reached_end) break;
     }
     debugFstab(fstab);
     return fstab;

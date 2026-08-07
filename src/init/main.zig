@@ -37,9 +37,10 @@ pub fn main(proc_init: std.process.Init) !void {
         format.header.printHeader();
         try debug.isPid1();
 
-        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.gpa);
+        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.gpa, false);
     } else {
-        err = init.cowabunga(&init.phase2Steps, proc_init.io, proc_init.gpa);
+        std.log.info("Running second phase", .{});
+        err = init.cowabunga(&init.phase2Steps, proc_init.io, proc_init.gpa, true);
     }
 
     emergencyShell(err);

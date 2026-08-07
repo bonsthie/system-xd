@@ -7,7 +7,8 @@ pub fn parseKernelArgs(io: std.Io, allocator: std.mem.Allocator) !std.StringHash
     const file = try std.Io.Dir.openFileAbsolute(io, "/proc/cmdline", .{});
     defer file.close(io);
 
-    var file_reader = file.reader(io, &.{});
+    var read_buffer: [4096]u8 = undefined;
+    var file_reader = file.reader(io, &read_buffer);
 
     const contents = try file_reader.interface.allocRemaining(
         allocator,
@@ -60,6 +61,6 @@ pub fn deinitKernelArgs(self: *?std.StringHashMap(?[]u8)) void {
                 map.allocator.free(val);
             }
         }
+        self.*.?.deinit();
     }
-    self.*.?.deinit();
 }

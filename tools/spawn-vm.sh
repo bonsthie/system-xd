@@ -26,6 +26,25 @@ if [ ! -d $DISTRO_BOOT ]; then
 	mv $TMP_TARGET $DISTRO_BOOT
 fi
 
+ALPINE_ROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64/alpine-minirootfs-3.21.2-x86_64.tar.gz"
+ROOTFS_IMG="$DISTRO_BOOT/rootfs.img"
+ROOTFS_MNT="$DISTRO_BOOT/rootfs-mnt"
+
+if [ ! -f "$ROOTFS_IMG" ]; then
+	log "Downloading Alpine minirootfs"
+	wget "$ALPINE_ROOTFS_URL" -O alpine-minirootfs.tar.gz
+
+	log "Creating disk image"
+	truncate -s 512M "$ROOTFS_IMG"
+	mkfs.ext4 -F -q "$ROOTFS_IMG"
+
+	log "Populating rootfs"
+	mkdir -p "$ROOTFS_MNT"
+	sudo mount -o loop "$ROOTFS_IMG" "$ROOTFS_MNT"
+	sudo tar -xzf alpine-minirootfs.tar.gz -C "$ROOTFS_MNT"
+	sudo umount "$ROOTFS_MNT"
+fi
+
 INITRAMFS_ORIG=$DISTRO_BOOT/initramfs-virt
 INITRAMFS_GEN=${INITRAMFS_GEN:-$DISTRO_BOOT/initramfs-virt.gen}
 
@@ -39,6 +58,8 @@ if [ ! -d $RAMFS_DUMP ]; then
 fi
 
 RAMFS_GEN=$DISTRO_BOOT/ramfs-gen
+
+bash ./fsck.sh
 
 # Build and add /init
 NO_REPLACE_INIT=${NO_REPLACE_INIT:-0}
@@ -57,10 +78,23 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 	rm -rf $RAMFS_GEN
 	cp -r $RAMFS_DUMP $RAMFS_GEN
 
+	log "Copying fsck impls to $RAMFS_GEN"
+	cp -vf ./e2fsck $RAMFS_GEN/e2fsck
+	cp -vf ./fsck.fat $RAMFS_GEN/fsck.fat
+
 	log "Replacing init"
 	rm -vrf $RAMFS_GEN/init
 	cp -v ../zig-out/bin/init $RAMFS_GEN/init
 	NEW_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
+	mkdir -p "$ROOTFS_MNT"
+	sudo mount -o loop "$ROOTFS_IMG" "$ROOTFS_MNT"
+	sudo rm -vf "$ROOTFS_MNT/sbin/init"
+	sudo cp -v ../zig-out/bin/init "$ROOTFS_MNT/sbin/init"
+	sudo cp -v ../zig-out/bin/xd "$ROOTFS_MNT/sbin/xd"
+	sudo umount "$ROOTFS_MNT"
+
+	REQUIRED_MODULES="virtio_blk"
+	python3 ./resolve-modules.py $RAMFS_GEN lib/modules/6.12.8-0-virt $REQUIRED_MODULES > $RAMFS_GEN/modules.xd
 
 	if [ "$OLD_HASH" != "$NEW_HASH" ]; then
 		log "initramfs changed, rebuilding"
@@ -105,11 +139,12 @@ if [ $BUILD -eq 1 ]; then
 	rm -rf $INITRAMFS_GEN.raw
 fi
 
+read -p "Press enter to continue"
 log "Launching qemu"
 # i have no idea what "sane" boot params are so i'm gonna guess this is gonna work and nobody is gonna bother actually checking any other configuration
 
 # CMDLINE_TTY="console=ttyS0" 
-CMDLINE_TTY="modules=loop,squashfs,sd-mod,usb-storage console=ttyS0 init=/bin/sh"
+CMDLINE_TTY="modules=loop,squashfs,sd-mod,usb-storage console=ttyS0"
 
 INITRAMFS_BOOT=${INITRAMFS_BOOT:-$INITRAMFS_GEN}
 GRAPHICS=${GRAPHICS:-0}
@@ -118,21 +153,21 @@ INITRAMFS_BOOT=${INITRAMFS_BOOT:-$INITRAMFS_GEN}
 GRAPHICS=${GRAPHICS:-0}
 # echo $CMDLINE
 if [ $GRAPHICS -eq 1 ]; then
-    log "qemu graphics version"
-	qemu-system-x86_64 \
-		-m 2048 \
-		-kernel $DISTRO_BOOT/vmlinuz-virt \
-		-initrd $INITRAMFS_BOOT \
-		-drive file=$ALPINE_FILE,format=raw,index=0 \
-		-append "modules=loop,squashfs,sd-mod,usb-storage"
+    log "qemu graphics version exploded, no more"
+	exit 1232138139
+	# qemu-system-x86_64 \
+	# 	-m 2048 \
+	# 	-kernel $DISTRO_BOOT/vmlinuz-virt \
+	# 	-initrd $INITRAMFS_BOOT \
+	# 	-drive file=$ALPINE_FILE,format=raw,index=0 \
+	# 	-append "modules=loop,squashfs,sd-mod,usb-storage"
 else
     log "qemu tty version"
-    qemu-system-x86_64 \
-        -m 2048 \
-        -kernel $DISTRO_BOOT/vmlinuz-virt \
-        -initrd $INITRAMFS_BOOT \
-        -drive file=$ALPINE_FILE,format=raw,index=0 \
-        -append "modules=loop,squashfs,sd-mod,usb-storage" \
-        -nographic \
-        -append "$CMDLINE_TTY" && reset
+	qemu-system-x86_64 \
+		-m 2048 \
+		-kernel "$DISTRO_BOOT/vmlinuz-virt" \
+		-initrd "$INITRAMFS_BOOT" \
+		-drive file="$ROOTFS_IMG",format=raw,if=virtio \
+		-append "root=/dev/vda rootfstype=ext4 rw $CMDLINE_TTY" \
+		-nographic && reset
 fi

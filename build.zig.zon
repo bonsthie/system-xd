@@ -4,10 +4,6 @@
     .version = "0.1.0",
 
     .dependencies = .{
-        .network = .{
-            .url = "https://github.com/mochalins/network/archive/084fed75370421e052afb0c759f927b6664a9553.tar.gz",
-            .hash = "network-0.1.0-Pm-AgiMxAQCuaDrGAfSxVHeozUQ2gU3jINGLFxJ1Zpld"
-        },
     },
     .paths = .{
         "build.zig",

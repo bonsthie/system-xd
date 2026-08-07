@@ -10,3 +10,4 @@ zig-pkg/
 zig-out/
 *.iso
 *.img
+*subject.*

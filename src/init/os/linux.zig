@@ -20,6 +20,24 @@ pub const MountFlags = enum(u32) {
     MS_NOATIME = 1024, // Do not update access times.
     MS_NODIRATIME = 2048, // Do not update directory access times.
     MS_BIND = 4096, // Bind directory at different place.
+    MS_MOVE = 8192,
+    MS_REC = 16384,
+    MS_SILENT = 32768,
+    MS_POSIXACL = (1<<16),
+    MS_UNBINDABLE = (1<<17),
+    MS_PRIVATE = (1<<18),
+    MS_SLAVE = (1<<19),
+    MS_SHARED = (1<<20),
+    MS_RELATIME = (1<<21),
+    MS_KERNMOUNT = (1<<22),
+    MS_I_VERSION = (1<<23),
+    MS_STRICTATIME = (1<<24),
+    MS_LAZYTIME = (1<<25),
+    MS_NOREMOTELOCK = (1<<27),
+    MS_NOSEC = (1<<28),
+    MS_BORN = (1<<29),
+    MS_ACTIVE = (1<<30),
+    MS_NOUSER = (1<<31),
 };
 
 pub fn toPosixSlice(allocator: std.mem.Allocator, strings: [][]const u8) ![*:0]const [*:0]const u8 {
@@ -40,6 +58,36 @@ pub fn symlink(existing: [*:0]const u8, new: [*:0]const u8) !void {
 
 pub fn mount(special: [*:0]const u8, dir: [*:0]const u8, fstype: ?[*:0]const u8, flags: u32, data: usize) !void {
     _ = try wrapErrno(linux.mount(special, dir, fstype, flags, data));
+}
+
+pub fn remount(dir: [*:0]const u8, flags: u32) !void {
+    _ = try wrapErrno(linux.mount(@ptrFromInt(0), dir, @ptrFromInt(0), flags, 0));
+}
+
+pub fn readlink(path: [*:0]const u8, buf: []u8) !usize {
+    const rc = linux.readlink(path, buf.ptr, buf.len);
+    return try wrapErrno(rc);
+}
+
+pub fn umount2(special: [*:0]const u8, flags: u32) !void {
+    _ = try wrapErrno(linux.umount2(special, flags));
+}
+
+pub fn chdir(path: [*:0]const u8) !void {
+    _ = try wrapErrno(linux.chdir(path));
+}
+
+pub fn pivot_root(new_root: [*:0]const u8, put_old: [*:0]const u8) !void {
+    _ = try wrapErrno(linux.pivot_root(new_root, put_old));
+}
+
+pub fn chroot(path: [*:0]const u8) !void {
+    _ = try wrapErrno(linux.chroot(path));
+}
+
+pub fn waitpid(pid: linux.pid_t, status: *u32, flags: u32) !linux.pid_t {
+    const rc = try wrapErrno(linux.waitpid(pid, status, flags));
+    return @intCast(rc);
 }
 
 pub fn dup2(oldfd: i32, newfd: i32) !void {
@@ -65,4 +113,27 @@ pub fn signal(sig: linux.SIG, handler: SigHandlerFn) !SigHandlerFn {
     var old: linux.Sigaction = undefined;
     _ = try wrapErrno(linux.sigaction(sig, &act, &old));
     return old.handler.handler;
+}
+
+const SYS_finit_module = 313; // x86_64
+
+pub fn finit_module(fd: linux.fd_t, param_values: [*:0]const u8, flags: u32) !void {
+    const rc = linux.syscall3(
+        @enumFromInt(SYS_finit_module),
+        @intCast(fd),
+        @intFromPtr(param_values),
+        flags,
+    );
+    _ = try wrapErrno(rc);
+}
+
+const SYS_swapon = 167;
+
+pub fn swapon(path: [*:0]const u8, flags: u32) !void {
+    const rc = linux.syscall2(
+        @enumFromInt(SYS_swapon),
+        @intFromPtr(path),
+        flags,
+    );
+    _ = try wrapErrno(rc);
 }

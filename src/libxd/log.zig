@@ -2,6 +2,8 @@ const std = @import("std");
 const log = std.log;
 const consts = @import("consts.zig");
 
+var log_io: std.Io.Threaded = std.Io.Threaded.init_single_threaded;
+
 pub const std_options: std.Options = .{
     .logFn = customLogFn,
     .log_level = if (consts.debug) .debug else .info,
@@ -13,9 +15,13 @@ pub fn customLogFn(
     comptime format: []const u8,
     args: anytype,
 ) void {
+    const io = log_io.io();
     const prefix = std.fmt.comptimePrint("[{s}/{s}]: ", .{ @tagName(scope), @tagName(level) });
-    const writer = std.io.getStdErr().writer();
-    writer.print(prefix, .{}) catch unreachable;
-    writer.print(format, args) catch unreachable;
-    writer.print("\n", .{}) catch unreachable;
+    var buffer: [256]u8 = undefined;
+    const stderr_file = std.Io.File.stderr();
+    var writer = stderr_file.writerStreaming(io, &buffer);
+    writer.interface.print(prefix, .{}) catch unreachable;
+    writer.interface.print(format, args) catch unreachable;
+    writer.interface.print("\n", .{}) catch unreachable;
+    writer.interface.flush() catch unreachable;
 }

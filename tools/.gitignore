@@ -1,2 +1,4 @@
 /e2fsck
 /fsck.fat
+*.iso
+*.tar.gz

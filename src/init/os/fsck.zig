@@ -1,61 +1,51 @@
 const std = @import("std");
-const fstab = @import("fstab.zig");
+const os = std.os.linux;
+const zos = @import("linux.zig");
 const log = std.log.scoped(.fsck);
 
-// { .name = "e2fsck", .file_bytes = @embedFile("./tools/e2fsck") }
-const FsCheckProgram = struct {
-    name: []const u8,
-    file_bytes: []const u8,
-};
-
-const e2fsck = FsCheckProgram{ .name = "e2fsck", .file_bytes = @embedFile("./tools/e2fsck") };
-const fsckFat = FsCheckProgram{ .name = "fsck.fat", .file_bytes = @embedFile("./tools/fsck.fat") };
-
-const fsCheckMap = std.StaticStringMap(*FsCheckProgram).initComptime(.{
-    .{ "ext2", &e2fsck },
-    .{ "ext3", &e2fsck },
-    .{ "ext4", &e2fsck },
-    .{ "fat32", &fsckFat },
-    .{ "fat16", &fsckFat },
-    .{ "vfat", &fsckFat },
-    .{ "fat", &fsckFat },
+const fsCheckMap = std.StaticStringMap([*:0]const u8).initComptime(.{
+    .{ "ext2", "/e2fsck" },
+    .{ "ext3", "/e2fsck" },
+    .{ "ext4", "/e2fsck" },
+    .{ "vfat", "/fsck.fat" },
+    .{ "fat", "/fsck.fat" },
+    .{ "fat16", "/fsck.fat" },
+    .{ "fat32", "/fsck.fat" },
 });
 
-fn ensureProgramExists(io: std.Io, program: *FsCheckProgram) !void {
-    if (program.file_bytes.len == 0) {
-        log.err("No program found for {s}", .{program.name});
-        return error.NoProgram;
-    }
-
-    // Try and drop the program in /tmp/<name>
-    const tmp = try std.Io.Dir.openFileAbsolute(io, "/tmp", .{ .mode = .write_only });
-    defer tmp.close(io);
+fn isExtFs(fstype: []const u8) bool {
+    return std.mem.eql(u8, fstype, "ext2") or
+        std.mem.eql(u8, fstype, "ext3") or
+        std.mem.eql(u8, fstype, "ext4");
 }
 
-fn fsckWithProgram(io: std.Io, fs: *fstab.FstabEntry, program: *FsCheckProgram) !void {
-    try ensureProgramExists(io, program);
-
-    const programPath = try std.fs.path.join(io, &.{ "/tmp", program.name });
-    const argv = &[_:null]?[*:0]const u8{
-        programPath,
-        fs.device,
-        fs.mountpoint,
+pub fn fsck(allocator: std.mem.Allocator, device: []const u8, fstype: []const u8) !void {
+    const program = fsCheckMap.get(fstype) orelse {
+        log.debug("No fsck program for {s}, skipping", .{fstype});
+        return;
     };
-    const process = try std.process.spawn(&.{ .argv = argv, .stdin = .ignore, .stdout = .ignore, .stderr = .ignore});
-    const term = try process.wait();
-    const exitcode = term.exited;
-    if (exitcode != 0) {
-        log.err("Failed to run fsck on {s}: {s}", .{ fs.mountpoint, exitcode });
-    }
-}
 
-pub fn fsck(io: std.Io, fs: *fstab.FstabEntry) void {
-    if (fsCheckMap.get(fs.fstype)) |checkProgram| {
-        log.debug("Running fsck on {s}", .{fs.mountpoint});
-        try fsckWithProgram(io, fs, checkProgram) catch |err| {
-            log.err("Failed to run fsck on {s}: {s}", .{ fs.mountpoint, err });
-        };
-    } else {
-        log.debug("{} is not handled by fsck, skipping...", .{fs.fstype});
+    const device_z = try allocator.dupeZ(u8, device);
+    defer allocator.free(device_z);
+
+    log.info("Running {s} on {s}", .{ program, device });
+
+    const pid = os.fork();
+    if (pid < 0) return error.ForkFailed;
+    if (pid == 0) {
+        const argv: [*:null]const ?[*:0]const u8 = if (isExtFs(fstype))
+            &[_:null]?[*:0]const u8{ program, "-f", "-y", device_z, null }
+        else
+            &[_:null]?[*:0]const u8{ program, "-a", device_z, null };
+        const envp = &[_:null]?[*:0]const u8{null};
+        zos.execve(program, argv, envp) catch os.exit(1);
+        os.exit(1);
+    }
+
+    var status: u32 = 0;
+    _ = try zos.waitpid(@intCast(pid), &status, 0);
+    if (os.W.IFEXITED(status) and os.W.EXITSTATUS(status) != 0) {
+        log.err("fsck on {s} exited with code {}", .{ device, os.W.EXITSTATUS(status) });
+        return error.FsckFailed;
     }
 }

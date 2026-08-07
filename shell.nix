@@ -4,6 +4,7 @@
 
 pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
+    python3
     zig
     e2tools
     qemu
