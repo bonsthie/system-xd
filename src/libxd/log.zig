@@ -9,6 +9,13 @@ pub const std_options: std.Options = .{
     .log_level = if (consts.debug) .debug else .info,
 };
 
+var log_target: std.Io.File = std.Io.File.stderr();
+
+pub fn setLogTarget(file: std.Io.File) void {
+    std.log.info("Setting log target to {}", .{file.handle});
+    log_target = file;
+}
+
 pub fn customLogFn(
     comptime level: log.Level,
     comptime scope: @TypeOf(.EnumLiteral),
@@ -18,8 +25,7 @@ pub fn customLogFn(
     const io = log_io.io();
     const prefix = std.fmt.comptimePrint("[{s}/{s}]: ", .{ @tagName(scope), @tagName(level) });
     var buffer: [256]u8 = undefined;
-    const stderr_file = std.Io.File.stderr();
-    var writer = stderr_file.writerStreaming(io, &buffer);
+    var writer = log_target.writerStreaming(io, &buffer);
     writer.interface.print(prefix, .{}) catch unreachable;
     writer.interface.print(format, args) catch unreachable;
     writer.interface.print("\n", .{}) catch unreachable;

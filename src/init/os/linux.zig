@@ -137,3 +137,14 @@ pub fn swapon(path: [*:0]const u8, flags: u32) !void {
     );
     _ = try wrapErrno(rc);
 }
+
+const SYS_sethostname = 170;
+
+pub fn sethostname(name: [*:0]const u8, len: usize) !void {
+    const rc = linux.syscall2(
+        @enumFromInt(SYS_sethostname),
+        @intFromPtr(name),
+        @intCast(len),
+    );
+    _ = try wrapErrno(rc);
+}

@@ -23,6 +23,7 @@ pkgs.mkShell {
     libtool
     automake
     autoconf
+    libguestfs-with-appliance
   ];
   shellHook = ''
     unset ZIG_GLOBAL_CACHE_DIR

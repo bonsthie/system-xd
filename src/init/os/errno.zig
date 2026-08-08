@@ -2,7 +2,7 @@ const std = @import("std");
 const os = std.os.linux;
 
 pub fn wrapErrno(err: anytype) anyerror!@TypeOf(err) {
-    std.log.debug("wrapErrno {}", .{ err });
+    // std.log.debug("wrapErrno {}", .{ err });
     const errno: usize = switch (@TypeOf(err)) {
         usize => err,
         i32 => @as(usize, @bitCast(@as(isize, err))),

@@ -41,34 +41,33 @@ fn writeTestTTY(fd: i32) !void {
     }
 }
 
-pub fn newTTY(fd: i32, mode: OpenMode) !i32 {
-    log.debug("dup {}", .{mode});
+pub fn newTTY(fd: i32, mode: OpenMode, claim_ctty: bool) !i32 {
     if (mode == .read_only or mode == .read_write) {
         try zos.dup2(fd, os.STDIN_FILENO);
     }
-
     if (mode == .write_only or mode == .read_write) {
         try zos.dup2(fd, os.STDOUT_FILENO);
-        try writeTestTTY(os.STDOUT_FILENO);
         try zos.dup2(fd, os.STDERR_FILENO);
-        try writeTestTTY(os.STDERR_FILENO);
     }
 
-    // set the /dev/console as the controling terminal
-    const TIOCSCTTY: u32 = 0x540E; // can't find it in os. (skill issue)
-    // _ = try wrapErrno(os.ioctl(fd, TIOCSCTTY, 0)); // mark as error even when working ??
-    _ = os.ioctl(fd, TIOCSCTTY, 0);
+    if (claim_ctty) {
+        const TIOCSCTTY: u32 = 0x540E;
+        zos.ioctl(fd, TIOCSCTTY, 0) catch |err| {
+            log.err("TIOCSCTTY failed on fd {d}: {s}", .{ fd, @errorName(err) });
+            return err;
+        };
+    }
 
     return fd;
 }
 
-pub fn newTTYFromName(io: std.Io, file: []const u8, mode: OpenMode) !i32 {
+pub fn newTTYFromName(io: std.Io, file: []const u8, mode: OpenMode, claim_ctty: bool) !i32 {
     const fd_file = std.Io.Dir.openFileAbsolute(io, file, .{ .mode = mode }) catch |err| {
         log.debug("{s} open fail : {}", .{ file, err });
         return error.NewTTYOpenFail;
     };
     defer if (fd_file.handle > 2) fd_file.close(io);
-    const ret = try newTTY(fd_file.handle, mode);
+    const ret = try newTTY(fd_file.handle, mode, claim_ctty);
     log.info("{s} is created successfully", .{file});
     return ret;
 }

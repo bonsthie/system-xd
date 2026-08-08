@@ -130,14 +130,15 @@ pub fn debugFsOptions(options: FsOptions) void {
 //---------------------------------------------------------------------
 // Debug printing for an fstab entry.
 pub fn debugFstabEntry(entry: FstabEntry) void {
-    std.debug.print("==== FstabEntry Debug ====\n", .{});
-    std.debug.print("Device: {s}\n", .{entry.device});
-    std.debug.print("Mount Point: {s}\n", .{entry.mount_options});
-    std.debug.print("Filesystem Type: {s}\n", .{entry.fstype});
-    std.debug.print("Dump: {d}\n", .{entry.dump});
-    std.debug.print("Pass: {d}\n", .{entry.pass});
-    debugFsOptions(entry.options);
-    std.debug.print("==== End of FstabEntry Debug ====\n", .{});
+    // std.debug.print("==== FstabEntry Debug ====\n", .{});
+    // std.debug.print("Device: {s}\n", .{entry.device});
+    // std.debug.print("Mount Point: {s}\n", .{entry.mount_options});
+    // std.debug.print("Filesystem Type: {s}\n", .{entry.fstype});
+    // std.debug.print("Dump: {d}\n", .{entry.dump});
+    // std.debug.print("Pass: {d}\n", .{entry.pass});
+    // debugFsOptions(entry.options);
+    // std.debug.print("==== End of FstabEntry Debug ====\n", .{});
+    _ = entry;
 }
 
 //---------------------------------------------------------------------
@@ -155,7 +156,7 @@ pub fn debugFstab(fstab: Fstab) void {
 //---------------------------------------------------------------------
 // Example function to update mount options from a string.
 fn updateMountOption(mo: *FsOptions, option: []const u8) void {
-    std.debug.print("mount option [{s}]\n", .{option});
+    // std.debug.print("mount option [{s}]\n", .{option});
     if (MountFlagsMap.get(option)) |opt| {
         mo.mountFlags |= opt;
     } else if (FsFlagsMap.get(option)) |opt| {
@@ -201,8 +202,8 @@ pub fn findRootEntry(fstab_entries: *const Fstab) ?FstabEntry {
     return null;
 }
 
-pub fn shouldAutoMount(entry: FstabEntry) bool {
-    if (std.mem.eql(u8, entry.fstype, "swap")) return false;
+pub fn shouldAutoMount(entry: FstabEntry, stage2: bool) bool {
+    if (std.mem.eql(u8, entry.fstype, "swap") and !stage2) return false;
     if (entry.options.flags & @intFromEnum(FsMountFlag.noauto) != 0) return false;
     return true;
 }
@@ -222,10 +223,16 @@ pub fn resolveDeviceSpec(allocator: std.mem.Allocator, spec: []const u8) ![]u8 {
 pub fn mountEntry(allocator: std.mem.Allocator, io: std.Io, entry: FstabEntry) !void {
     const device_z = try allocator.dupeZ(u8, entry.device);
     defer allocator.free(device_z);
-    const mount_z = try allocator.dupeZ(u8, entry.mount_options);
-    defer allocator.free(mount_z);
     const fstype_z = try allocator.dupeZ(u8, entry.fstype);
     defer allocator.free(fstype_z);
+
+    if (std.mem.eql(u8, entry.fstype, "swap")) {
+        _ = try linux.swapon(device_z, entry.options.mountFlags);
+        return;
+    }
+
+    const mount_z = try allocator.dupeZ(u8, entry.mount_options);
+    defer allocator.free(mount_z);
 
     try std.Io.Dir.createDirPath(.cwd(), io, entry.mount_options);
     try linux.mount(device_z, mount_z, fstype_z, entry.options.mountFlags, 0);

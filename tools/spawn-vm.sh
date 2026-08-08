@@ -40,9 +40,15 @@ if [ ! -f "$ROOTFS_IMG" ]; then
 
 	log "Populating rootfs"
 	mkdir -p "$ROOTFS_MNT"
-	sudo mount -o loop "$ROOTFS_IMG" "$ROOTFS_MNT"
-	sudo tar -xzf alpine-minirootfs.tar.gz -C "$ROOTFS_MNT"
-	sudo umount "$ROOTFS_MNT"
+
+	guestmount \
+		-a "$ROOTFS_IMG" \
+		-m /dev/sda \
+		"$ROOTFS_MNT"
+
+	tar -xzf alpine-minirootfs.tar.gz -C "$ROOTFS_MNT"
+
+	guestunmount "$ROOTFS_MNT"
 fi
 
 INITRAMFS_ORIG=$DISTRO_BOOT/initramfs-virt
@@ -87,11 +93,19 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 	cp -v ../zig-out/bin/init $RAMFS_GEN/init
 	NEW_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
 	mkdir -p "$ROOTFS_MNT"
-	sudo mount -o loop "$ROOTFS_IMG" "$ROOTFS_MNT"
-	sudo rm -vf "$ROOTFS_MNT/sbin/init"
-	sudo cp -v ../zig-out/bin/init "$ROOTFS_MNT/sbin/init"
-	sudo cp -v ../zig-out/bin/xd "$ROOTFS_MNT/sbin/xd"
-	sudo umount "$ROOTFS_MNT"
+	mkdir -p "$ROOTFS_MNT"
+
+	guestmount \
+		-a "$ROOTFS_IMG" \
+		-m /dev/sda \
+		"$ROOTFS_MNT"
+
+	rm -vf "$ROOTFS_MNT/sbin/init"
+	cp -v ../zig-out/bin/init "$ROOTFS_MNT/sbin/init"
+	touch "$ROOTFS_MNT/.rootfs-marker"
+	cp -v ../zig-out/bin/xd "$ROOTFS_MNT/sbin/xd"
+
+	guestunmount "$ROOTFS_MNT"
 
 	REQUIRED_MODULES="virtio_blk"
 	python3 ./resolve-modules.py $RAMFS_GEN lib/modules/6.12.8-0-virt $REQUIRED_MODULES > $RAMFS_GEN/modules.xd
@@ -153,7 +167,7 @@ INITRAMFS_BOOT=${INITRAMFS_BOOT:-$INITRAMFS_GEN}
 GRAPHICS=${GRAPHICS:-0}
 # echo $CMDLINE
 if [ $GRAPHICS -eq 1 ]; then
-    log "qemu graphics version exploded, no more"
+	log "qemu graphics version exploded, no more"
 	exit 1232138139
 	# qemu-system-x86_64 \
 	# 	-m 2048 \
@@ -162,12 +176,12 @@ if [ $GRAPHICS -eq 1 ]; then
 	# 	-drive file=$ALPINE_FILE,format=raw,index=0 \
 	# 	-append "modules=loop,squashfs,sd-mod,usb-storage"
 else
-    log "qemu tty version"
+	log "qemu tty version"
 	qemu-system-x86_64 \
 		-m 2048 \
 		-kernel "$DISTRO_BOOT/vmlinuz-virt" \
 		-initrd "$INITRAMFS_BOOT" \
 		-drive file="$ROOTFS_IMG",format=raw,if=virtio \
 		-append "root=/dev/vda rootfstype=ext4 rw $CMDLINE_TTY" \
-		-nographic && reset
+		-nographic
 fi

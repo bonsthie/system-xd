@@ -8,8 +8,11 @@ const dbg = @import("debug.zig");
 const log = std.log.scoped(.init);
 const argsModule = @import("args.zig");
 const process = @import("process.zig");
+const rtc = @import("os/rtc.zig");
 
+const service = @import("service.zig");
 const consts = @import("xd").consts;
+const logModule = @import("xd").log;
 
 const wrapErrno = @import("os/errno.zig").wrapErrno;
 const parseKernelArgs = argsModule.parseKernelArgs;
@@ -23,7 +26,10 @@ pub const InitSystem = struct {
     root_device: ?[]u8 = null,
     root_fstype: ?[]u8 = null,
     stage2: bool = false,
+    running: bool = true,
+    services: ?service.ServiceTable = null,
 };
+pub var g_services: ?*service.ServiceTable = null;
 
 const root_mount = "/mnt";
 
@@ -120,7 +126,7 @@ fn mountUserFilesystems(init: *InitSystem) !void {
 
     const slog = std.log.scoped(.mount);
     for (f.entries.items) |entry| {
-        if (!fstab.shouldAutoMount(entry)) continue;
+        if (!fstab.shouldAutoMount(entry, init.stage2)) continue;
         if (std.mem.eql(u8, entry.mount_options, "/")) continue;
 
         slog.info("Mounting {s} on {s} ({s})", .{ entry.device, entry.mount_options, entry.fstype });
@@ -138,24 +144,34 @@ fn noop(_: *InitSystem) !void {
     log.debug("@ noop", .{});
 }
 
-fn createConsole(init: *InitSystem) !void {
-    for (1..100) |i| {
-        log.debug("Open /dev/console try [{}]", .{i});
-        _ = process.newTTYFromName(init.io, "/dev/console", .read_write) catch |err| {
-            log.debug("createConsole error {}", .{err});
-        };
-    }
-    return error.failCreateConsole;
+fn attachKmsg(init: *InitSystem) !void {
+    const kmsg = try std.Io.Dir.openFileAbsolute(init.io, "/dev/kmsg", .{ .mode = .write_only });
+    logModule.setLogTarget(kmsg);
 }
+
+// fn createConsole(init: *InitSystem) !void {
+//     _ = process.newTTYFromName(init.io, "/dev/console", .read_write, false) catch |err| {
+//         log.warn("Could not attach to /dev/console: {s}", .{@errorName(err)});
+//         return;
+//     };
+// }
 
 fn triggerReboot(sig: os.SIG) callconv(.c) void {
     _ = sig;
+}
+
+fn sigchldHandler(sig: os.SIG) callconv(.c) void {
+    _ = sig;
+    if (g_services) |table| table.reap();
 }
 
 /// Sets-up common signal handlers.
 fn setupSignalHandlers(_: *InitSystem) !void {
     _ = zos.signal(os.SIG.INT, triggerReboot) catch |err| {
         log.err("Failed to setup SIGINT handler: {s}", .{@errorName(err)});
+    };
+    _ = zos.signal(os.SIG.CHLD, sigchldHandler) catch |err| {
+        log.err("Failed to setup SIGCHLD handler: {s}", .{@errorName(err)});
     };
 }
 
@@ -204,15 +220,78 @@ fn mountKernelVirtualFileSystems(init: *InitSystem) !void {
     }
 }
 
+const RTC_DEVICE = "/dev/rtc0";
+const DEFAULT_EPOCH: i64 = 1_735_689_600; // 2025-01-01T00:00:00Z fallback
+
 fn setTime(init: *InitSystem) !void {
-    const t = std.Io.Clock.now(.real, init.io);
-    if (t.toSeconds() > 0) {
-        // TODO use t.formatNumber for the print
-        std.log.info("time : {}", .{t});
+    const now = std.Io.Clock.now(.real, init.io);
+    if (now.toSeconds() > 0) {
+        log.info("time already set: {}", .{now});
         return;
     }
-    std.log.info("time is not set", .{});
-    std.log.info("setting default time", .{});
+
+    log.info("time is not set, attempting RTC read from {s}", .{RTC_DEVICE});
+
+    const unix_time: i64 = blk: {
+        const file = std.Io.Dir.openFileAbsolute(init.io, RTC_DEVICE, .{}) catch |err| {
+            log.warn("Could not open {s}: {s}, falling back to default time", .{ RTC_DEVICE, @errorName(err) });
+            break :blk DEFAULT_EPOCH;
+        };
+        defer file.close(init.io);
+
+        const rtc_time = rtc.readRtcTime(file.handle) catch |err| {
+            log.warn("RTC_RD_TIME failed: {s}, falling back to default time", .{@errorName(err)});
+            break :blk DEFAULT_EPOCH;
+        };
+
+        const t = rtc.rtcTimeToUnix(rtc_time);
+        log.info("Read RTC time: {d}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}:{d:0>2} UTC", .{
+            rtc_time.tm_year + 1900, rtc_time.tm_mon + 1, rtc_time.tm_mday,
+            rtc_time.tm_hour, rtc_time.tm_min, rtc_time.tm_sec,
+        });
+        break :blk t;
+    };
+
+    const ts = os.timespec{ .sec = unix_time, .nsec = 0 };
+    _ = try wrapErrno(os.clock_settime(os.CLOCK.REALTIME, &ts));
+
+    log.info("System time set to {d}", .{unix_time});
+}
+
+fn setHostname(init: *InitSystem) !void {
+    const hostname = blk: {
+        if (init.args) |args| {
+            if (args.getPtr("hostname")) |arg| {
+                break :blk try init.allocator.dupe(u8, arg.*.?);
+            }
+        }
+        const file = std.Io.Dir.openFileAbsolute(init.io, "/etc/hostname", .{}) catch {
+            log.warn("Could not open /etc/hostname, setting default hostname", .{});
+            break :blk try init.allocator.dupe(u8, "xd-machine");
+        };
+        defer file.close(init.io);
+
+        var buffer: [512]u8 = undefined;
+        var reader = file.reader(init.io, &buffer);
+
+        break :blk try reader.interface.allocRemaining(init.allocator, .unlimited);
+    };
+    defer init.allocator.free(hostname);
+
+    const hostname_z = try init.allocator.dupeZ(u8, hostname);
+    defer init.allocator.free(hostname_z);
+
+    var len = hostname.len;
+    if (std.mem.indexOfScalar(u8, hostname_z, '\n')) |i| {
+        hostname_z[i] = 0;
+        len = i;
+    }
+    if (len > 255) {
+        len = 255;
+    }
+
+    _ = try zos.sethostname(hostname_z, len);
+    log.info("Hostname set to {s}", .{hostname_z});
 }
 
 const MODULE_LIST = "/modules.xd";
@@ -286,12 +365,34 @@ fn parseKernelArguments(system: *InitSystem) !void {
 //     try dbg.dumpFilesystemTree(init.io, null);
 // }
 
-fn createTTY(init: *InitSystem) !void {
-    _ = try process.spawnProcess(&.{ .io = init.io, .filename = "/dev/tty1" });
-    _ = try process.spawnProcess(&.{ .io = init.io, .filename = "/dev/tty2" });
-    _ = try process.spawnProcess(&.{ .io = init.io, .filename = "/dev/tty3" });
-    _ = try process.spawnProcess(&.{ .io = init.io, .filename = "/dev/tty4" });
-    _ = try process.spawnProcess(&.{ .io = init.io, .filename = "/dev/tty5" });
+fn disablePrintk(init: *InitSystem) !void {
+    const file = std.Io.Dir.openFileAbsolute(init.io, "/proc/sys/kernel/printk", .{ .mode = .write_only }) catch |err| {
+        log.warn("Could not open /proc/sys/kernel/printk: {s}", .{@errorName(err)});
+        return;
+    };
+    defer file.close(init.io);
+
+    var writer_buf: [16]u8 = undefined;
+    var writer = file.writerStreaming(init.io, &writer_buf);
+    try writer.interface.print("1\n", .{}); // console_loglevel=1: only emergencies
+    try writer.interface.flush();
+}
+
+const login_argv = &[_:null]?[*:0]const u8{ "/bin/busybox", "login", null };
+const login_envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", null };
+
+var tty_services = [_]service.Service{
+    .{ .name = "console", .path = "/bin/busybox", .argv = login_argv, .envp = login_envp, .tty = "/dev/console" },
+    .{ .name = "tty1",    .path = "/bin/busybox", .argv = login_argv, .envp = login_envp, .tty = "/dev/tty1" },
+    .{ .name = "tty2",    .path = "/bin/busybox", .argv = login_argv, .envp = login_envp, .tty = "/dev/tty2" },
+    .{ .name = "tty3",    .path = "/bin/busybox", .argv = login_argv, .envp = login_envp, .tty = "/dev/tty3" },
+    .{ .name = "tty4",    .path = "/bin/busybox", .argv = login_argv, .envp = login_envp, .tty = "/dev/tty4" },
+};
+
+fn daemonInit(init: *InitSystem) !void {
+    init.services = .{ .services = &tty_services, .io = init.io };
+    g_services = &init.services.?;
+    init.services.?.spawnAll();
 }
 
 const Step = struct {
@@ -301,9 +402,9 @@ const Step = struct {
 
 pub const phase1Steps = [_]Step{
     .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
+    .{ .msg = "Attach /dev/kmsg", .func = &attachKmsg },
     .{ .msg = "Parse kernel arguments", .func = &parseKernelArguments },
     .{ .msg = "Load required kernel modules", .func = &loadRequiredModules },
-    .{ .msg = "Set time", .func = &setTime },
     //.{ .msg = "Parse initramfs fstab", .func = &parseFstab },
     .{ .msg = "Integrity check fsroot", .func = &checkRootIntegrity },
     .{ .msg = "Mount fsroot and chroot", .func = &mountRootAndChroot },
@@ -311,14 +412,16 @@ pub const phase1Steps = [_]Step{
 };
 
 pub const phase2Steps = [_]Step{
+    .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
+    .{ .msg = "Attach /dev/kmsg", .func = &attachKmsg },
     .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
     .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
-    .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
+    .{ .msg = "Set system time", .func = &setTime },
+    .{ .msg = "Set system hostname", .func = &setHostname },
     .{ .msg = "Parse fstab", .func = &parseFstab },
     .{ .msg = "Mount user filesystems", .func = &mountUserFilesystems },
-    // .{ .msg = "Open tty's and login", .func = &createTTY }, // will be xd.eamon
-    .{ .msg = "Start xd.aemon", .func = &noop },
-    // .{ .msg = "Creation of a console", .func = &createConsole },
+    .{ .msg = "Shut printk", .func = &disablePrintk },
+    .{ .msg = "Start xd.aemon", .func = &daemonInit },
 };
 
 /// The true "main" function, which is where all the init stuff happens.
@@ -350,7 +453,10 @@ pub fn cowabunga(steps: []const Step, io: std.Io, allocator: std.mem.Allocator, 
         log.debug("= Done in {d}ms", .{after - before});
     }
 
-    log.debug("Dropping you to a shell for testing...", .{});
+    log.debug("Finished init, waiting for userspace...", .{});
+    initSystem.running = true;
+    while (initSystem.running) {}
+    //TODO: shutdown?
+
     return error.DropToShell;
-    // while (true) {}
 }
