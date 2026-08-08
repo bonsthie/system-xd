@@ -10,9 +10,7 @@ if [ "$DIRECTORY" != "." ]; then
 	cd $DIRECTORY
 fi
 
-ALPINE_URL="https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64/alpine-virt-3.21.2-x86_64.iso"
-ALPINE_FILE="alpine-virt-3.21.2-x86_64.iso"
-DISTRO_BOOT="$(pwd)/.distro"
+source ./config.sh
 
 if [ ! -d $DISTRO_BOOT ]; then
 	if [ ! -f $ALPINE_FILE ]; then
@@ -26,10 +24,6 @@ if [ ! -d $DISTRO_BOOT ]; then
 	mv $TMP_TARGET $DISTRO_BOOT
 fi
 
-ALPINE_ROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64/alpine-minirootfs-3.21.2-x86_64.tar.gz"
-ROOTFS_IMG="$DISTRO_BOOT/rootfs.img"
-ROOTFS_MNT="$DISTRO_BOOT/rootfs-mnt"
-
 if [ ! -f "$ROOTFS_IMG" ]; then
 	log "Downloading Alpine minirootfs"
 	wget "$ALPINE_ROOTFS_URL" -O alpine-minirootfs.tar.gz
@@ -41,20 +35,28 @@ if [ ! -f "$ROOTFS_IMG" ]; then
 	log "Populating rootfs"
 	mkdir -p "$ROOTFS_MNT"
 
+	log "Guestmounting..."
 	guestmount \
 		-a "$ROOTFS_IMG" \
 		-m /dev/sda \
 		"$ROOTFS_MNT"
 
+	log "Copying rootfs..."
 	tar -xzf alpine-minirootfs.tar.gz -C "$ROOTFS_MNT"
 
+	log "Unmounting rootfs..."
 	guestunmount "$ROOTFS_MNT"
+
+	sleep 1
+
+	log "Running guestfish"
+	guestfish -a "$ROOTFS_IMG" -i <<-EOF
+		command "sh -c 'echo root:root | chpasswd'"
+		command "sh -c 'adduser -D user'"
+		command "sh -c 'echo user:user | chpasswd'"
+	EOF
+	log "Done"
 fi
-
-INITRAMFS_ORIG=$DISTRO_BOOT/initramfs-virt
-INITRAMFS_GEN=${INITRAMFS_GEN:-$DISTRO_BOOT/initramfs-virt.gen}
-
-RAMFS_DUMP=$DISTRO_BOOT/ramfs-dump
 
 if [ ! -d $RAMFS_DUMP ]; then
 	log "Extracting initial initramfs"
@@ -62,8 +64,6 @@ if [ ! -d $RAMFS_DUMP ]; then
 	zcat initramfs-virt | cpio -idmv -D ${RAMFS_DUMP##*/} 2>/dev/null
 	popd >/dev/null
 fi
-
-RAMFS_GEN=$DISTRO_BOOT/ramfs-gen
 
 bash ./fsck.sh
 
