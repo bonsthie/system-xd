@@ -148,3 +148,12 @@ pub fn sethostname(name: [*:0]const u8, len: usize) !void {
     );
     _ = try wrapErrno(rc);
 }
+
+const SYS_sigsuspend = 130;
+
+pub fn sigsuspend(mask: *const linux.sigset_t) void {
+    _ = linux.syscall1(
+        @enumFromInt(SYS_sigsuspend),
+        @intFromPtr(mask),
+    );
+}

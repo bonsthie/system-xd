@@ -6,6 +6,13 @@ const init = @import("init.zig");
 const debug = @import("debug.zig");
 
 const format = @import("xd").format;
+const logModule = @import("xd").log;
+const consts = @import("xd").consts;
+
+pub const std_options: std.Options = .{
+    .logFn = logModule.customLogFn,
+    .log_level = if (consts.debug) .debug else .info,
+};
 
 fn emergencyShell(initError: anyerror) void {
     log.err("Caught an unexpected error: {s}", .{@errorName(initError)});

@@ -4,11 +4,6 @@ const consts = @import("consts.zig");
 
 var log_io: std.Io.Threaded = std.Io.Threaded.init_single_threaded;
 
-pub const std_options: std.Options = .{
-    .logFn = customLogFn,
-    .log_level = if (consts.debug) .debug else .info,
-};
-
 var log_target: std.Io.File = std.Io.File.stderr();
 
 pub fn setLogTarget(file: std.Io.File) void {

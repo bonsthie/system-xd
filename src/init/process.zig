@@ -48,6 +48,8 @@ pub fn newTTY(fd: i32, mode: OpenMode, claim_ctty: bool) !i32 {
     if (mode == .write_only or mode == .read_write) {
         try zos.dup2(fd, os.STDOUT_FILENO);
         try zos.dup2(fd, os.STDERR_FILENO);
+        const seq = "\x1b[2J\x1b[H";
+        _ = os.write(fd, seq, seq.len);
     }
 
     if (claim_ctty) {

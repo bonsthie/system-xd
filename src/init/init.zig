@@ -414,13 +414,13 @@ pub const phase1Steps = [_]Step{
 pub const phase2Steps = [_]Step{
     .{ .msg = "Mount kernel virtual filesystems", .func = &mountKernelVirtualFileSystems },
     .{ .msg = "Attach /dev/kmsg", .func = &attachKmsg },
+    .{ .msg = "Shut printk", .func = &disablePrintk },
     .{ .msg = "Setup signal handlers", .func = &setupSignalHandlers },
     .{ .msg = "Disable CAD syskey", .func = &disableCADSyskey },
     .{ .msg = "Set system time", .func = &setTime },
     .{ .msg = "Set system hostname", .func = &setHostname },
     .{ .msg = "Parse fstab", .func = &parseFstab },
     .{ .msg = "Mount user filesystems", .func = &mountUserFilesystems },
-    .{ .msg = "Shut printk", .func = &disablePrintk },
     .{ .msg = "Start xd.aemon", .func = &daemonInit },
 };
 
@@ -454,8 +454,12 @@ pub fn cowabunga(steps: []const Step, io: std.Io, allocator: std.mem.Allocator, 
     }
 
     log.debug("Finished init, waiting for userspace...", .{});
+
     initSystem.running = true;
-    while (initSystem.running) {}
+    var empty_mask: os.sigset_t = std.mem.zeroes(os.sigset_t);
+    while (initSystem.running) {
+        zos.sigsuspend(&empty_mask);
+    }
     //TODO: shutdown?
 
     return error.DropToShell;
