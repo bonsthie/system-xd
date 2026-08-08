@@ -1,10 +1,10 @@
-const linux = @import("linux.zig");
-const init = @import("../init.zig");
+const syscall = @import("syscall.zig");
+const std = @import("std");
+
 const log = std.log.scoped(.fstab);
 
-const MountFlags = linux.MountFlags;
-
-const std = @import("std");
+const MountFlags = syscall.MountFlags;
+const Env = @import("env.zig").Env;
 
 //---------------------------------------------------------------------
 // Enum for filesystem mount flags.
@@ -227,7 +227,7 @@ pub fn mountEntry(allocator: std.mem.Allocator, io: std.Io, entry: FstabEntry) !
     defer allocator.free(fstype_z);
 
     if (std.mem.eql(u8, entry.fstype, "swap")) {
-        _ = try linux.swapon(device_z, entry.options.mountFlags);
+        _ = try syscall.swapon(device_z, entry.options.mountFlags);
         return;
     }
 
@@ -235,41 +235,41 @@ pub fn mountEntry(allocator: std.mem.Allocator, io: std.Io, entry: FstabEntry) !
     defer allocator.free(mount_z);
 
     try std.Io.Dir.createDirPath(.cwd(), io, entry.mount_options);
-    try linux.mount(device_z, mount_z, fstype_z, entry.options.mountFlags, 0);
+    try syscall.mount(device_z, mount_z, fstype_z, entry.options.mountFlags, 0);
 }
 
 //---------------------------------------------------------------------
 // small fstab parser
 // (maybe rm the file name and check if getenv("FSTAB_FILE") exist)
-pub fn loadFstabEntries(initSystem: *init.InitSystem, filename: []const u8) !Fstab {
-    const fd = std.Io.Dir.openFileAbsolute(initSystem.io, filename, .{}) catch |err| {
+pub fn loadFstabEntries(env: Env, filename: []const u8) !Fstab {
+    const fd = std.Io.Dir.openFileAbsolute(env.io, filename, .{}) catch |err| {
         log.debug("{s} open fail : {}", .{ filename, err });
         return error.EntriesFileOpenFail;
     };
-    defer fd.close(initSystem.io);
+    defer fd.close(env.io);
 
-    var fstab = Fstab {
-        .entries = std.ArrayList(FstabEntry).initCapacity(initSystem.allocator, 10) catch unreachable,
-        .allocator = initSystem.allocator,
+    var fstab = Fstab{
+        .entries = std.ArrayList(FstabEntry).initCapacity(env.allocator, 10) catch unreachable,
+        .allocator = env.allocator,
     };
     errdefer fstab.deinit();
 
     var read_buffer: [4096]u8 = undefined;
-    var file_reader = fd.reader(initSystem.io, &read_buffer);
+    var file_reader = fd.reader(env.io, &read_buffer);
 
     const contents = try file_reader.interface.allocRemaining(
-        initSystem.allocator,
+        env.allocator,
         .limited(1024 * 1024),
     );
-    defer initSystem.allocator.free(contents);
+    defer env.allocator.free(contents);
 
     var lines = std.mem.splitScalar(u8, contents, '\n');
     while (lines.next()) |line_raw| {
         const line = std.mem.trim(u8, line_raw, " \t\r");
         if (line.len != 0 and line[0] != '#') {
             log.debug("line {s}", .{line});
-            const entry = try initFstabEntry(initSystem.allocator, line);
-            try fstab.entries.append(initSystem.allocator, entry);
+            const entry = try initFstabEntry(env.allocator, line);
+            try fstab.entries.append(env.allocator, entry);
         }
     }
     debugFstab(fstab);

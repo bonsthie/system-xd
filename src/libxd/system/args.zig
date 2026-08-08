@@ -1,8 +1,6 @@
 const std = @import("std");
 const log = std.log.scoped(.args);
 
-
-
 pub fn parseKernelArgs(io: std.Io, allocator: std.mem.Allocator) !std.StringHashMap(?[]u8) {
     var map = std.StringHashMap(?[]u8).init(allocator);
 
@@ -64,5 +62,6 @@ pub fn deinitKernelArgs(self: *?std.StringHashMap(?[]u8)) void {
             }
         }
         self.*.?.deinit();
+        self.* = null;
     }
 }

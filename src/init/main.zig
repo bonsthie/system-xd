@@ -1,14 +1,17 @@
 const std = @import("std");
 const log = std.log.scoped(.main);
 const os = std.os.linux;
-const zos = @import("os/linux.zig");
+
+const xd = @import("xd");
+const format = xd.format;
+const logModule = xd.log;
+const consts = xd.consts;
+const syscall = xd.system.syscall;
+
 const init = @import("init.zig");
 const debug = @import("debug.zig");
 
-const format = @import("xd").format;
-const logModule = @import("xd").log;
-const consts = @import("xd").consts;
-
+// do not move this should be in the root of the program folder
 pub const std_options: std.Options = .{
     .logFn = logModule.customLogFn,
     .log_level = if (consts.debug) .debug else .info,
@@ -21,7 +24,7 @@ fn emergencyShell(initError: anyerror) void {
     const argv = &[_:null]?[*:0]const u8{ "/bin/sh", "-i" };
     const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
 
-    zos.execve("/bin/sh", argv, envp) catch |err| {
+    syscall.execve("/bin/sh", argv, envp) catch |err| {
         log.err("Failed to execve /bin/sh: {}, rebooting...", .{err});
     };
     _ = os.sync();

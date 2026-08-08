@@ -1,6 +1,6 @@
 const std = @import("std");
 const os = std.os.linux;
-const zos = @import("linux.zig");
+const syscall = @import("syscall.zig");
 const log = std.log.scoped(.fsck);
 
 const fsCheckMap = std.StaticStringMap([*:0]const u8).initComptime(.{
@@ -38,12 +38,12 @@ pub fn fsck(allocator: std.mem.Allocator, device: []const u8, fstype: []const u8
         else
             &[_:null]?[*:0]const u8{ program, "-a", device_z, null };
         const envp = &[_:null]?[*:0]const u8{null};
-        zos.execve(program, argv, envp) catch os.exit(1);
+        syscall.execve(program, argv, envp) catch os.exit(1);
         os.exit(1);
     }
 
     var status: u32 = 0;
-    _ = try zos.waitpid(@intCast(pid), &status, 0);
+    _ = try syscall.waitpid(@intCast(pid), &status, 0);
     if (os.W.IFEXITED(status) and os.W.EXITSTATUS(status) != 0) {
         log.err("fsck on {s} exited with code {}", .{ device, os.W.EXITSTATUS(status) });
         return error.FsckFailed;

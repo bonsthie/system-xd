@@ -1,20 +1,22 @@
 //! The init system.
 const std = @import("std");
-const zos = @import("os/linux.zig");
-const fstab = @import("os/fstab.zig");
-const fsck = @import("os/fsck.zig");
+const fstab = syscall.fstab;
+const fsck = syscall.fsck;
 const os = std.os.linux;
-const dbg = @import("debug.zig");
+const rtc = syscall.rtc;
+
+const xd = @import("xd");
+const argsModule = xd.system.args;
+const dbg = xd.debug;
+const syscall = xd.system.syscall;
+const consts = xd.consts;
+const logModule = xd.log;
+const process = xd.system.process;
+const service = xd.system.service;
+
 const log = std.log.scoped(.init);
-const argsModule = @import("args.zig");
-const process = @import("process.zig");
-const rtc = @import("os/rtc.zig");
 
-const service = @import("service.zig");
-const consts = @import("xd").consts;
-const logModule = @import("xd").log;
-
-const wrapErrno = @import("os/errno.zig").wrapErrno;
+const wrapErrno = syscall.errno.wrapErrno;
 const parseKernelArgs = argsModule.parseKernelArgs;
 const deinitKernelArgs = argsModule.deinitKernelArgs;
 
@@ -84,9 +86,9 @@ fn checkRootIntegrity(init: *InitSystem) !void {
 
     try std.Io.Dir.createDirPath(.cwd(), init.io, root_mount);
 
-    const ro_flags = @intFromEnum(zos.MountFlags.MS_RDONLY);
+    const ro_flags = @intFromEnum(syscall.MountFlags.MS_RDONLY);
     log.info("Mounting root {s} ({s}) on {s} read-only", .{ device, fstype, root_mount });
-    try zos.mount(device_z, root_mount, fstype_z, ro_flags, 0);
+    try syscall.mount(device_z, root_mount, fstype_z, ro_flags, 0);
 
     try fsck.fsck(init.allocator, device, fstype);
 }
@@ -95,27 +97,27 @@ fn execPhase2(init: *InitSystem) !void {
     const exe_path = try init.allocator.dupeZ(u8, "/sbin/init");
     const argv = &[_:null]?[*:0]const u8{ exe_path, "phase2", null };
     const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", null };
-    try zos.execve(exe_path, argv, envp);
+    try syscall.execve(exe_path, argv, envp);
 }
 
 fn mountRootAndChroot(init: *InitSystem) !void {
     if (init.root_device == null) try resolveRoot(init);
 
     log.info("Remounting root fs '{s}' read-write", .{root_mount});
-    try zos.remount(root_mount, @intFromEnum(zos.MountFlags.MS_REMOUNT));
+    try syscall.remount(root_mount, @intFromEnum(syscall.MountFlags.MS_REMOUNT));
 
     // We're on rootfs (initramfs), which pivot_root() cannot pivot away
     // from (EINVAL: "the current root is on the rootfs mount"). Use the
     // switch_root technique instead: MS_MOVE the new root onto "/",
     // then chroot into it.
-    try zos.chdir(root_mount);
+    try syscall.chdir(root_mount);
 
     log.debug("Moving new root onto /", .{});
-    try zos.mount(".", "/", "none", @intFromEnum(zos.MountFlags.MS_MOVE), 0);
+    try syscall.mount(".", "/", "none", @intFromEnum(syscall.MountFlags.MS_MOVE), 0);
 
     log.debug("Chrooting into new root", .{});
-    try zos.chroot(".");
-    try zos.chdir("/");
+    try syscall.chroot(".");
+    try syscall.chdir("/");
 }
 
 fn mountUserFilesystems(init: *InitSystem) !void {
@@ -167,10 +169,10 @@ fn sigchldHandler(sig: os.SIG) callconv(.c) void {
 
 /// Sets-up common signal handlers.
 fn setupSignalHandlers(_: *InitSystem) !void {
-    _ = zos.signal(os.SIG.INT, triggerReboot) catch |err| {
+    _ = syscall.signal(os.SIG.INT, triggerReboot) catch |err| {
         log.err("Failed to setup SIGINT handler: {s}", .{@errorName(err)});
     };
-    _ = zos.signal(os.SIG.CHLD, sigchldHandler) catch |err| {
+    _ = syscall.signal(os.SIG.CHLD, sigchldHandler) catch |err| {
         log.err("Failed to setup SIGCHLD handler: {s}", .{@errorName(err)});
     };
 }
@@ -200,12 +202,12 @@ fn mountKernelVirtualFileSystems(init: *InitSystem) !void {
     };
     inline for (mounts) |mount| {
         slog.debug("+ Mounting {s}", .{mount[1]});
-        try zos.mount(mount[0], mount[1], mount[2], mount[3], mount[4]);
+        try syscall.mount(mount[0], mount[1], mount[2], mount[3], mount[4]);
     }
 
     try std.Io.Dir.createDirPath(.cwd(), init.io, "/sys/kernel/debug");
     slog.debug("+ Mounting /sys/kernel/debug", .{});
-    try zos.mount("none", "/sys/kernel/debug", "debugfs", 0, 0);
+    try syscall.mount("none", "/sys/kernel/debug", "debugfs", 0, 0);
 
     const symlinkPaths = .{
         .{ "/run", "/var/run" },
@@ -213,7 +215,7 @@ fn mountKernelVirtualFileSystems(init: *InitSystem) !void {
     };
     inline for (symlinkPaths) |symlink| {
         slog.debug("+ Linking {s} to target {s}", .{ symlink[1], symlink[0] });
-        zos.symlink(symlink[0], symlink[1]) catch |err| switch (err) {
+        syscall.symlink(symlink[0], symlink[1]) catch |err| switch (err) {
             error.FileExists => {},
             else => return err,
         };
@@ -290,7 +292,7 @@ fn setHostname(init: *InitSystem) !void {
         len = 255;
     }
 
-    _ = try zos.sethostname(hostname_z, len);
+    _ = try syscall.sethostname(hostname_z, len);
     log.info("Hostname set to {s}", .{hostname_z});
 }
 
@@ -305,7 +307,7 @@ fn loadModule(init: *InitSystem, path: []const u8) !void {
     const fd: os.fd_t = file.handle;
     const empty_params: [*:0]const u8 = "";
 
-    try zos.finit_module(fd, empty_params, 0);
+    try syscall.finit_module(fd, empty_params, 0);
     slog.debug("+ Loaded module {s}", .{path});
 }
 
@@ -342,7 +344,8 @@ fn loadRequiredModules(init: *InitSystem) !void {
 }
 
 fn parseFstab(init: *InitSystem) !void {
-    init.fstab = try fstab.loadFstabEntries(init, "/etc/fstab");
+
+    init.fstab = try fstab.loadFstabEntries(.{.io = init.io, .allocator = init.allocator}, "/etc/fstab");
 }
 
 fn parseKernelArguments(system: *InitSystem) !void {
@@ -458,7 +461,7 @@ pub fn cowabunga(steps: []const Step, io: std.Io, allocator: std.mem.Allocator, 
     initSystem.running = true;
     var empty_mask: os.sigset_t = std.mem.zeroes(os.sigset_t);
     while (initSystem.running) {
-        zos.sigsuspend(&empty_mask);
+        syscall.sigsuspend(&empty_mask);
     }
     //TODO: shutdown?
 

@@ -1,9 +1,9 @@
 const std = @import("std");
 const log = std.log.scoped(.process);
 const os = std.os.linux;
-const zos = @import("os/linux.zig");
+const syscall = @import("syscall.zig");
 
-const wrapErrno = @import("os/errno.zig").wrapErrno;
+const wrapErrno = @import("errno.zig").wrapErrno;
 
 const OpenMode = std.Io.Dir.OpenFileOptions.Mode;
 
@@ -17,7 +17,7 @@ pub const Error = error{
 var loginPath: ?[*:0]const u8 = null;
 var loginArgs: ?[*:null]const ?[*:0]const u8 = null;
 
-pub const ProcessConfig = struct {
+pub const Config = struct {
     io: std.Io,
     command: ?[*:0]const u8 = null,
     args: ?[*:null]const ?[*:0]const u8 = null,
@@ -43,18 +43,18 @@ fn writeTestTTY(fd: i32) !void {
 
 pub fn newTTY(fd: i32, mode: OpenMode, claim_ctty: bool) !i32 {
     if (mode == .read_only or mode == .read_write) {
-        try zos.dup2(fd, os.STDIN_FILENO);
+        try syscall.dup2(fd, os.STDIN_FILENO);
     }
     if (mode == .write_only or mode == .read_write) {
-        try zos.dup2(fd, os.STDOUT_FILENO);
-        try zos.dup2(fd, os.STDERR_FILENO);
+        try syscall.dup2(fd, os.STDOUT_FILENO);
+        try syscall.dup2(fd, os.STDERR_FILENO);
         const seq = "\x1b[2J\x1b[H";
         _ = os.write(fd, seq, seq.len);
     }
 
     if (claim_ctty) {
         const TIOCSCTTY: u32 = 0x540E;
-        zos.ioctl(fd, TIOCSCTTY, 0) catch |err| {
+        syscall.ioctl(fd, TIOCSCTTY, 0) catch |err| {
             log.err("TIOCSCTTY failed on fd {d}: {s}", .{ fd, @errorName(err) });
             return err;
         };
@@ -87,7 +87,7 @@ fn getDefaultArgs() [*:null]const ?[*:0]const u8 {
     return loginArgs.?;
 }
 
-pub fn spawnProcess(config: *const ProcessConfig) !usize {
+pub fn spawn(config: *const Config) !usize {
     const pid = if (config.newProcess) os.fork() else 0;
 
     if (pid < -1) {
@@ -105,7 +105,7 @@ pub fn spawnProcess(config: *const ProcessConfig) !usize {
         const command = config.command orelse getDefaultCommand();
         const args = config.args orelse getDefaultArgs();
         const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
-        try zos.execve(command, args, envp);
+        try syscall.execve(command, args, envp);
         os.exit(1);
     }
     return pid;

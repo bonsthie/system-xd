@@ -1,4 +1,6 @@
 pub const log = @import("log.zig");
 pub const consts = @import("consts.zig");
 pub const format = @import("format/root.zig");
-pub const service = @import("service.zig");
+pub const system = @import("system/system.zig");
+pub const service = system.service;
+pub const debug = @import("debug.zig");
