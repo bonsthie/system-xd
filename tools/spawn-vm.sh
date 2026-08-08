@@ -44,6 +44,8 @@ if [ ! -f "$ROOTFS_IMG" ]; then
 	log "Copying rootfs..."
 	tar -xzf alpine-minirootfs.tar.gz -C "$ROOTFS_MNT"
 
+	echo -n "supermachine" > "$ROOTFS_MNT/etc/hostname"
+
 	log "Unmounting rootfs..."
 	guestunmount "$ROOTFS_MNT"
 
