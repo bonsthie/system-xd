@@ -51,7 +51,7 @@ pub fn setTime(env: Env) !void {
     };
 
     const timestamp = std.os.linux.timespec{ .sec = unix_time, .nsec = 0 };
-    _ = try syscall.errno.wrapErrno(std.os.linux.clock_settime(std.os.linux.CLOCK.REALTIME, &timestamp));
+    _ = try syscall.clock_settime(std.os.linux.CLOCK.REALTIME, &timestamp);
     log.info("System time set to {d}", .{unix_time});
 }
 

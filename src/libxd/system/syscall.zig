@@ -115,6 +115,19 @@ pub fn sethostname(name: [*:0]const u8, len: usize) !void {
     _ = try wrapErrno(rc);
 }
 
+pub fn reboot(
+    magic1: linux.LINUX_REBOOT.MAGIC1,
+    magic2: linux.LINUX_REBOOT.MAGIC2,
+    command: linux.LINUX_REBOOT.CMD,
+    arg: ?*const anyopaque,
+) !void {
+    _ = try wrapErrno(linux.reboot(magic1, magic2, command, arg));
+}
+
+pub fn clock_settime(clock_id: linux.clockid_t, timestamp: *const linux.timespec) !void {
+    _ = try wrapErrno(linux.clock_settime(clock_id, timestamp));
+}
+
 const SYS_sigsuspend = 130;
 
 pub fn sigsuspend(mask: *const linux.sigset_t) void {

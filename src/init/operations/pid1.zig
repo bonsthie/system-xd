@@ -19,7 +19,7 @@ pub fn setupSignalHandlers() !void {
 }
 
 pub fn disableCad() !void {
-    _ = try syscall.errno.wrapErrno(os.reboot(.MAGIC1, .MAGIC2, .CAD_OFF, null));
+    _ = try syscall.reboot(.MAGIC1, .MAGIC2, .CAD_OFF, null);
 }
 
 pub fn watchServices(services: *ServiceTable) void {

@@ -28,7 +28,7 @@ fn emergencyShell(initError: anyerror) void {
         log.err("Failed to execve /bin/sh: {}, rebooting...", .{err});
     };
     _ = os.sync();
-    _ = os.reboot(.MAGIC1, .MAGIC2, .RESTART, null);
+    syscall.reboot(.MAGIC1, .MAGIC2, .RESTART, null) catch {};
 }
 
 fn isFirstPhase(proc_init: *const std.process.Init) bool {
