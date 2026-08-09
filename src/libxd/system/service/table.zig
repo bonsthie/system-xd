@@ -120,15 +120,28 @@ pub const ServiceTable = struct {
             defer env.allocator.free(absPath);
 
             srvArray[i] = .{
-                .decl = try parser.fromToml(env, absPath),
+                .decl = parser.fromToml(env, absPath) catch {
+                    log.warn("Failed to parse service {s}", .{absPath});
+                    continue;
+                },
                 .running = false,
                 .pid = -1,
             };
-            errdefer env.allocator.free(srvArray[i]);
+            errdefer env.allocator.free(srvArray[i].decl);
             i += 1;
         }
+        size = i;
+        i = 0;
 
-        return ServiceTable{ .services = srvArray, .env = env };
+        const services = try env.allocator.alloc(ServiceData, size);
+        errdefer env.allocator.free(services);
+        for (services) |*svc| {
+            svc.* = srvArray[i];
+            i += 1;
+        }
+        env.allocator.free(srvArray);
+
+        return ServiceTable{ .services = services, .env = env };
     }
 
     pub fn format(self: ServiceTable, writer: *std.Io.Writer) !void {

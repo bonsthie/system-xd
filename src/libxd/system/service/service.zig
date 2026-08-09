@@ -13,6 +13,7 @@ pub const Service = struct {
     envp: []const []const u8 = &.{},
     restart: RestartPolicy = .always,
     tty: ?[]const u8 = null, // if set, open+claim this tty before exec
+    enabled: bool = false,
 
     fn formatArray(writer: *std.Io.Writer, array: []const []const u8) !void {
         try writer.print("[", .{});
@@ -38,6 +39,7 @@ pub const Service = struct {
         if (self.tty) |tty| {
             try writer.print("    .tty = {s},\n", .{tty});
         }
+        try writer.print("    .enabled = {s},\n", .{if (self.enabled) "true" else "false"});
         try writer.print("}}\n", .{});
     }
 };
