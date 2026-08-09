@@ -1,0 +1,11 @@
+name = "print-time"
+path = "/bin/sh"
+
+argv = [
+    "/bin/sh",
+    "-c",
+    "(echo -n 'xd.time is '; date +%T) > example/time.txt"
+]
+
+restart = "never"
+enabled = true
