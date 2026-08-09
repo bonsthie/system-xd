@@ -11,7 +11,7 @@ pub fn daemon(env: Env, _: []const []const u8) !void {
         log.err("Failed to create daemon server: {s}", .{@errorName(err)});
         return;
     };
-    // defer server.deinit();
+    defer server.deinit();
     server.run() catch |err| {
         log.err("Error while running daemon: {s}", .{@errorName(err)});
         return;

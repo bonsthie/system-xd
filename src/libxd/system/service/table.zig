@@ -76,6 +76,10 @@ pub const ServiceTable = struct {
             }
         }
     }
+    
+    pub fn deinit(self: *ServiceTable) void {
+        self.env.allocator.free(self.services);
+    }
 
     pub fn create(env: Env, dirName: []const u8) !ServiceTable {
         try std.Io.Dir.createDirPath(.cwd(), env.io, dirName);

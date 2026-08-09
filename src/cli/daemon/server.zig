@@ -18,6 +18,11 @@ pub const DaemonServer = struct {
         _ = self;
         log.info("Running daemon server", .{});
     }
+
+    pub fn deinit(self: *DaemonServer) void {
+        self.services.deinit();
+        // self.socket.close();
+    }
 };
 
 pub fn create(env: Env) !DaemonServer {
