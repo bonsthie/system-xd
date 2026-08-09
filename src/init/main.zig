@@ -8,7 +8,7 @@ const logModule = xd.log;
 const consts = xd.consts;
 const syscall = xd.system.syscall;
 
-const init = @import("init.zig");
+const phase = @import("phase/phase.zig");
 const debug = @import("debug.zig");
 
 // do not move this should be in the root of the program folder
@@ -41,17 +41,23 @@ fn isFirstPhase(proc_init: *const std.process.Init) bool {
 const network = @import("network");
 
 pub fn main(proc_init: std.process.Init) !void {
-    var err: anyerror = error.noError;
+    const env = xd.system.Env{ .io = proc_init.io, .allocator = proc_init.gpa };
 
     if (isFirstPhase(&proc_init)) {
         format.header.printHeader();
         try debug.isPid1();
 
-        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.gpa, false);
-    } else {
-        std.log.info("Running second phase", .{});
-        err = init.cowabunga(&init.phase2Steps, proc_init.io, proc_init.gpa, true);
+        phase.run(.initramfs, env) catch |err| {
+            emergencyShell(err);
+            return;
+        };
+        emergencyShell(error.Phase1Returned);
+        return;
     }
 
-    emergencyShell(err);
+    std.log.info("Running second phase", .{});
+    phase.run(.system, env) catch |err| {
+        emergencyShell(err);
+        return;
+    };
 }

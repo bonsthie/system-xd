@@ -9,9 +9,6 @@ const wrapErrno = errno.wrapErrno;
 
 pub const MountFlags = @import("mount.zig").Flags;
 pub const mount = @import("mount.zig").mount;
-pub const fsck = @import("fsck.zig");
-pub const fstab = @import("fstab.zig");
-pub const rtc = @import("rtc.zig");
 
 pub fn toPosixSlice(allocator: std.mem.Allocator, strings: [][]const u8) ![*:0]const [*:0]const u8 {
     const len = strings.len;

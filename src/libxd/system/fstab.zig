@@ -96,7 +96,7 @@ pub const Fstab = struct {
 
 //---------------------------------------------------------------------
 // Debug printing for filesystem options using our compile-time arrays.
-pub fn debugFsOptions(options: FsOptions) void {
+fn debugOptions(options: FsOptions) void {
     std.debug.print("==== Filesystem Options Debug ====\n", .{});
     std.debug.print("Mount Flags (raw): 0x{X}\n", .{options.mountFlags});
     std.debug.print("Filesystem Flags (raw): 0x{X}\n", .{options.flags});
@@ -129,27 +129,27 @@ pub fn debugFsOptions(options: FsOptions) void {
 
 //---------------------------------------------------------------------
 // Debug printing for an fstab entry.
-pub fn debugFstabEntry(entry: FstabEntry) void {
+fn debugEntry(entry: FstabEntry) void {
     // std.debug.print("==== FstabEntry Debug ====\n", .{});
     // std.debug.print("Device: {s}\n", .{entry.device});
     // std.debug.print("Mount Point: {s}\n", .{entry.mount_options});
     // std.debug.print("Filesystem Type: {s}\n", .{entry.fstype});
     // std.debug.print("Dump: {d}\n", .{entry.dump});
     // std.debug.print("Pass: {d}\n", .{entry.pass});
-    // debugFsOptions(entry.options);
+    // debugOptions(entry.options);
     // std.debug.print("==== End of FstabEntry Debug ====\n", .{});
     _ = entry;
 }
 
 //---------------------------------------------------------------------
 // Debug printing for the entire fstab.
-pub fn debugFstab(fstab: Fstab) void {
+fn debug(fstab: Fstab) void {
     if (fstab.entries.items.len == 0) {
         std.debug.print("Fstab is empty\n", .{});
         return;
     }
     for (fstab.entries.items) |entry| {
-        debugFstabEntry(entry);
+        debugEntry(entry);
     }
 }
 
@@ -241,7 +241,7 @@ pub fn mountEntry(allocator: std.mem.Allocator, io: std.Io, entry: FstabEntry) !
 //---------------------------------------------------------------------
 // small fstab parser
 // (maybe rm the file name and check if getenv("FSTAB_FILE") exist)
-pub fn loadFstabEntries(env: Env, filename: []const u8) !Fstab {
+pub fn load(env: Env, filename: []const u8) !Fstab {
     const fd = std.Io.Dir.openFileAbsolute(env.io, filename, .{}) catch |err| {
         log.debug("{s} open fail : {}", .{ filename, err });
         return error.EntriesFileOpenFail;
@@ -272,6 +272,6 @@ pub fn loadFstabEntries(env: Env, filename: []const u8) !Fstab {
             try fstab.entries.append(env.allocator, entry);
         }
     }
-    debugFstab(fstab);
+    debug(fstab);
     return fstab;
 }

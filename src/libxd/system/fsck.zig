@@ -19,7 +19,7 @@ fn isExtFs(fstype: []const u8) bool {
         std.mem.eql(u8, fstype, "ext4");
 }
 
-pub fn fsck(allocator: std.mem.Allocator, device: []const u8, fstype: []const u8) !void {
+pub fn run(allocator: std.mem.Allocator, device: []const u8, fstype: []const u8) !void {
     const program = fsCheckMap.get(fstype) orelse {
         log.debug("No fsck program for {s}, skipping", .{fstype});
         return;
