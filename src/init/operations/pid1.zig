@@ -1,5 +1,6 @@
 const std = @import("std");
 const os = std.os.linux;
+const log = std.log.scoped(.syscall);
 const system = @import("xd").system;
 
 const ServiceTable = system.service.ServiceTable;
@@ -7,15 +8,28 @@ const syscall = system.syscall;
 
 var active_services: ?*ServiceTable = null;
 
+//TODO: wire those
 fn triggerReboot(_: os.SIG) callconv(.c) void {}
+fn triggerShutdown(_: os.SIG) callconv(.c) void {}
+fn triggerHalt(_: os.SIG) callconv(.c) void {}
 
 fn reapChildren(_: os.SIG) callconv(.c) void {
     if (active_services) |services| services.reap();
 }
 
 pub fn setupSignalHandlers() !void {
-    _ = try syscall.signal(os.SIG.INT, triggerReboot);
-    _ = try syscall.signal(os.SIG.CHLD, reapChildren);
+    const handlers = .{
+        .{ os.SIG.INT, triggerReboot },
+        .{ os.SIG.TERM, triggerReboot },
+        .{ os.SIG.USR1, triggerShutdown },
+        .{ os.SIG.USR2, triggerHalt },
+        .{ os.SIG.CHLD, reapChildren },
+    };
+    inline for (handlers) |handler| {
+        _ = syscall.signal(handler[0], handler[1]) catch |err| {
+            log.err("Failed to setup SIG{s} handler: {s}", .{ @tagName(handler[0]), @errorName(err) });
+        };
+    }
 }
 
 pub fn disableCad() !void {
