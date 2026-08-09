@@ -16,13 +16,13 @@ pub const RtcTime = extern struct {
 
 const RTC_RD_TIME: u32 = 0x80247009;
 
-pub fn readRtcTime(fd: linux.fd_t) !RtcTime {
+pub fn readTime(fd: linux.fd_t) !RtcTime {
     var t: RtcTime = std.mem.zeroes(RtcTime);
     _ = try wrapErrno(linux.ioctl(fd, RTC_RD_TIME, @intFromPtr(&t)));
     return t;
 }
 
-pub fn rtcTimeToUnix(t: RtcTime) i64 {
+pub fn toUnix(t: RtcTime) i64 {
     const year: i64 = @as(i64, t.tm_year) + 1900;
     const month: i64 = @as(i64, t.tm_mon) + 1; // tm_mon is 0-11
     const day: i64 = @as(i64, t.tm_mday);

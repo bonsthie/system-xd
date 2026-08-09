@@ -62,5 +62,6 @@ pub fn deinitKernelArgs(self: *?std.StringHashMap(?[]u8)) void {
             }
         }
         self.*.?.deinit();
+        self.* = null;
     }
 }

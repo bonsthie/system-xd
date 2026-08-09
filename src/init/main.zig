@@ -1,14 +1,17 @@
 const std = @import("std");
 const log = std.log.scoped(.main);
 const os = std.os.linux;
-const zos = @import("os/linux.zig");
-const init = @import("init.zig");
+
+const xd = @import("xd");
+const format = xd.format;
+const logModule = xd.log;
+const consts = xd.consts;
+const syscall = xd.system.syscall;
+
+const phase = @import("phase/phase.zig");
 const debug = @import("debug.zig");
 
-const format = @import("xd").format;
-const logModule = @import("xd").log;
-const consts = @import("xd").consts;
-
+// do not move this should be in the root of the program folder
 pub const std_options: std.Options = .{
     .logFn = logModule.customLogFn,
     .log_level = if (consts.debug) .debug else .info,
@@ -21,11 +24,11 @@ fn emergencyShell(initError: anyerror) void {
     const argv = &[_:null]?[*:0]const u8{ "/bin/sh", "-i" };
     const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
 
-    zos.execve("/bin/sh", argv, envp) catch |err| {
+    syscall.execve("/bin/sh", argv, envp) catch |err| {
         log.err("Failed to execve /bin/sh: {}, rebooting...", .{err});
     };
     _ = os.sync();
-    _ = os.reboot(.MAGIC1, .MAGIC2, .RESTART, null);
+    syscall.reboot(.MAGIC1, .MAGIC2, .RESTART, null) catch {};
 }
 
 fn isFirstPhase(proc_init: *const std.process.Init) bool {
@@ -38,17 +41,23 @@ fn isFirstPhase(proc_init: *const std.process.Init) bool {
 const network = @import("network");
 
 pub fn main(proc_init: std.process.Init) !void {
-    var err: anyerror = error.noError;
+    const env = xd.system.Env{ .io = proc_init.io, .allocator = proc_init.gpa };
 
     if (isFirstPhase(&proc_init)) {
         format.header.printHeader();
         try debug.isPid1();
 
-        err = init.cowabunga(&init.phase1Steps, proc_init.io, proc_init.gpa, false);
-    } else {
-        std.log.info("Running second phase", .{});
-        err = init.cowabunga(&init.phase2Steps, proc_init.io, proc_init.gpa, true);
+        phase.run(.initramfs, env) catch |err| {
+            emergencyShell(err);
+            return;
+        };
+        emergencyShell(error.Phase1Returned);
+        return;
     }
 
-    emergencyShell(err);
+    std.log.info("Running second phase", .{});
+    phase.run(.system, env) catch |err| {
+        emergencyShell(err);
+        return;
+    };
 }

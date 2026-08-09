@@ -1,10 +1,10 @@
 const std = @import("std");
 const os = std.os.linux;
-const zos = @import("os/linux.zig");
+const syscall = @import("../syscall.zig");
 const log = std.log.scoped(.service);
-const process = @import("process.zig");
+const process = @import("../process.zig");
 
-const service = @import("xd").service;
+const service = @import("service.zig");
 
 pub const RestartPolicy = service.RestartPolicy;
 pub const Service = service.Service;
@@ -28,7 +28,7 @@ pub const ServiceTable = struct {
             if (svc.tty) |tty_path| {
                 _ = process.newTTYFromName(self.io, tty_path, .read_write, true) catch os.exit(1);
             }
-            zos.execve(svc.path, svc.argv, svc.envp) catch {};
+            syscall.execve(svc.path, svc.argv, svc.envp) catch {};
             os.exit(1);
         }
         svc.pid = @intCast(pid);
@@ -45,7 +45,7 @@ pub const ServiceTable = struct {
     pub fn reap(self: *ServiceTable) void {
         while (true) {
             var status: u32 = 0;
-            const pid = zos.waitpid(-1, &status, os.W.NOHANG) catch break;
+            const pid = syscall.waitpid(-1, &status, os.W.NOHANG) catch break;
             if (pid <= 0) break;
 
             if (self.findByPid(pid)) |svc| {

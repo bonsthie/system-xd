@@ -1,0 +1,111 @@
+const os = @import("std").os.linux;
+const system = @import("xd").system;
+
+const Cmdline = system.Cmdline;
+const Env = system.Env;
+const Fstab = system.fstab.Fstab;
+const ServiceTable = system.service.ServiceTable;
+
+const operations = @import("../operations/root.zig");
+const step = @import("step.zig");
+
+const fstab_path = "/etc/fstab";
+
+pub const Ctx = struct {
+    env: Env,
+    cmdline: ?Cmdline = null,
+    fstab: ?Fstab = null,
+    services: ?ServiceTable = null,
+
+    pub fn init(env: Env) Ctx {
+        return .{ .env = env };
+    }
+
+    pub fn deinit(self: *Ctx) void {
+        if (self.cmdline) |*cmdline| cmdline.deinit();
+        if (self.fstab) |*fstab| fstab.deinit();
+    }
+
+    fn requireCmdline(self: *Ctx) !*Cmdline {
+        return if (self.cmdline) |*cmdline| cmdline else error.CmdlineNotLoaded;
+    }
+
+    fn requireFstab(self: *Ctx) !*Fstab {
+        return if (self.fstab) |*fstab| fstab else error.FstabNotLoaded;
+    }
+
+    fn requireServices(self: *Ctx) !*ServiceTable {
+        return if (self.services) |*services| services else error.ServicesNotStarted;
+    }
+};
+
+const PhaseStep = step.Step(Ctx);
+
+pub const Steps = [_]PhaseStep{
+    .{ .msg = "Mount kernel virtual filesystems", .func = mountKernelVirtualFilesystems },
+    .{ .msg = "Attach /dev/kmsg", .func = attachKmsg },
+    .{ .msg = "Shut printk", .func = disablePrintk },
+    .{ .msg = "Parse kernel arguments", .func = parseKernelArguments },
+    .{ .msg = "Setup signal handlers", .func = setupSignalHandlers },
+    .{ .msg = "Disable CAD syskey", .func = disableCadSyskey },
+    .{ .msg = "Set system time", .func = setTime },
+    .{ .msg = "Set system hostname", .func = setHostname },
+    .{ .msg = "Parse fstab", .func = parseFstab },
+    .{ .msg = "Mount user filesystems", .func = mountUserFilesystems },
+    .{ .msg = "Start login services", .func = startServices },
+};
+
+pub fn run(env: Env) !noreturn {
+    _ = os.setsid();
+
+    var ctx = Ctx.init(env);
+    defer ctx.deinit();
+
+    try step.runAll(Ctx, &ctx, &Steps);
+    operations.pid1.wait();
+}
+
+fn mountKernelVirtualFilesystems(ctx: *Ctx) !void {
+    try operations.mounts.kernelVirtualFilesystems(ctx.env);
+}
+
+fn attachKmsg(ctx: *Ctx) !void {
+    try operations.kmsg.attach(ctx.env);
+}
+
+fn disablePrintk(ctx: *Ctx) !void {
+    try operations.machine.disablePrintk(ctx.env);
+}
+
+fn parseKernelArguments(ctx: *Ctx) !void {
+    ctx.cmdline = try Cmdline.load(ctx.env);
+}
+
+fn setupSignalHandlers(_: *Ctx) !void {
+    try operations.pid1.setupSignalHandlers();
+}
+
+fn disableCadSyskey(_: *Ctx) !void {
+    try operations.pid1.disableCad();
+}
+
+fn setTime(ctx: *Ctx) !void {
+    try operations.machine.setTime(ctx.env);
+}
+
+fn setHostname(ctx: *Ctx) !void {
+    try operations.machine.setHostname(ctx.env, try ctx.requireCmdline());
+}
+
+fn parseFstab(ctx: *Ctx) !void {
+    ctx.fstab = try system.fstab.load(ctx.env, fstab_path);
+}
+
+fn mountUserFilesystems(ctx: *Ctx) !void {
+    try operations.mounts.configuredFilesystems(ctx.env, try ctx.requireFstab());
+}
+
+fn startServices(ctx: *Ctx) !void {
+    ctx.services = operations.login.start(ctx.env);
+    operations.pid1.watchServices(try ctx.requireServices());
+}
