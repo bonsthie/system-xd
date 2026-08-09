@@ -7,19 +7,21 @@ const linux = std.os.linux;
 pub const errno = @import("errno.zig");
 const wrapErrno = errno.wrapErrno;
 
-pub const MountFlags = @import("mount.zig").Flags;
-pub const mount = @import("mount.zig").mount;
+const mountMod = @import("mount.zig");
+pub const MountFlags = mountMod.Flags;
+pub const mount = mountMod.mount;
 
-pub fn toPosixSlice(allocator: std.mem.Allocator, strings: [][]const u8) ![*:0]const [*:0]const u8 {
+pub fn toPosixSlice(allocator: std.mem.Allocator, strings: []const []const u8) ![:null]?[*:0] u8 {
     const len = strings.len;
-    var ptrs = try allocator.alloc([*:0]const u8, len + 1);
+    var ptrs = try allocator.allocSentinel(?[*:0]u8, len, null);
+    errdefer allocator.free(ptrs);
 
     for (strings, 0..) |s, i| {
         ptrs[i] = try allocator.dupeZ(u8, s);
+        errdefer allocator.free(ptrs[i]);
     }
-    ptrs[len] = null;
 
-    return ptrs.ptr;
+    return ptrs;
 }
 
 pub fn symlink(existing: [*:0]const u8, new: [*:0]const u8) !void {

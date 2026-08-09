@@ -35,7 +35,6 @@ pub fn build(b: *Build) void {
         .imports = libxdImports,
     });
 
-
     const imports: []const Import = &.{
         .{ .name = LIBXD_NAME, .module = libxd },
     };

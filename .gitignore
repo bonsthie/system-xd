@@ -11,3 +11,4 @@ zig-out/
 *.iso
 *.img
 *subject.*
+services-test

@@ -4,7 +4,7 @@ path = "/bin/sh"
 argv = [
     "/bin/sh",
     "-c",
-    "echo hello"
+    "echo hello && sleep 10"
 ]
 
 envp = [
