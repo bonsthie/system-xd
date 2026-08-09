@@ -5,3 +5,4 @@ pub const parser = @import("parser.zig");
 pub const RestartPolicy = definition.RestartPolicy;
 pub const Service = definition.Service;
 pub const ServiceTable = table.ServiceTable;
+pub const ServiceData = table.ServiceData;

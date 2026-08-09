@@ -32,7 +32,7 @@ pub fn create(env: Env) !DaemonServer {
         break :blk ServiceTable{ .services = &.{}, .env = env };
     };
 
-    log.debug("Service table: {any}", .{serviceTable});
+    log.debug("Service table: {f}", .{serviceTable});
 
     return DaemonServer{
         .socket = 0,

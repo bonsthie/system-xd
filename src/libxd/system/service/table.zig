@@ -13,42 +13,54 @@ pub const Service = service.Service;
 
 const SERVICE_FILE_SUFFIX = ".service.toml";
 
+pub const ServiceData = struct {
+    decl: Service,
+    pid: os.pid_t = -1,
+    running: bool = false,
+};
+
 pub const ServiceTable = struct {
-    services: []Service,
+    services: []ServiceData,
     env: Env,
 
     pub fn spawnAll(self: *ServiceTable) void {
+        var i: usize = 0;
         for (self.services) |*svc| {
             self.spawn(svc) catch |err| {
-                log.err("Failed to spawn service {s}: {s}", .{ svc.name, @errorName(err) });
+                log.err("Failed to spawn service {s}: {s}", .{ svc.decl.name, @errorName(err) });
+                i += 1;
+                continue;
             };
+            svc.running = true;
+            i += 1;
         }
     }
 
-    fn spawn(self: *ServiceTable, svc: *Service) !void {
+    fn spawn(self: *ServiceTable, svc: *ServiceData) !void {
         const pid = os.fork();
         if (pid < 0) { // b-but zig has errors built into its type system!!!! yes and i don't have another month to spare so fuck you, C my beloved<3
-            log.err("Failed to fork for service {s}", .{svc.name});
-            return;
+            log.err("Failed to fork for service {s}", .{svc.decl.name});
+            return error.ForkFailed;
         }
         if (pid == 0) {
             _ = os.setsid();
-            if (svc.tty) |tty_path| {
+            if (svc.decl.tty) |tty_path| {
                 _ = process.newTTYFromName(self.env.io, tty_path, .read_write, true) catch os.exit(1);
             }
             
-            const cPath = try self.env.allocator.dupeZ(u8, svc.path);
-            const cArgv = try syscall.toPosixSlice(self.env.allocator, svc.argv);
-            const cEnvp = try syscall.toPosixSlice(self.env.allocator, svc.envp);
+            const cPath = try self.env.allocator.dupeZ(u8, svc.decl.path);
+            const cArgv = try syscall.toPosixSlice(self.env.allocator, svc.decl.argv);
+            const cEnvp = try syscall.toPosixSlice(self.env.allocator, svc.decl.envp);
 
             try syscall.execve(cPath, cArgv, cEnvp);
             os.exit(1);
         }
         svc.pid = @intCast(pid);
-        log.info("Started service {s} (pid {d})", .{ svc.name, svc.pid });
+        svc.running = true;
+        log.info("Started service {s} (pid {d})", .{ svc.decl.name, svc.pid });
     }
 
-    fn findByPid(self: *ServiceTable, pid: os.pid_t) ?*Service {
+    fn findByPid(self: *ServiceTable, pid: os.pid_t) ?*ServiceData {
         for (self.services) |*svc| {
             if (svc.pid == pid) return svc;
         }
@@ -62,12 +74,12 @@ pub const ServiceTable = struct {
             if (pid <= 0) break;
 
             if (self.findByPid(pid)) |svc| {
-                log.warn("Service {s} (pid {d}) exited, status {d}", .{ svc.name, pid, os.W.EXITSTATUS(status) });
+                log.warn("Service {s} (pid {d}) exited, status {d}", .{ svc.decl.name, pid, os.W.EXITSTATUS(status) });
                 svc.pid = -1;
-                switch (svc.restart) {
+                svc.running = false;
+                switch (svc.decl.restart) {
                     .always => self.spawn(svc) catch |err| {
-                        svc.pid = -1;
-                        log.err("Failed to spawn service {s}: {s}", .{ svc.name, @errorName(err) });
+                        log.err("Failed to spawn service {s}: {s}", .{ svc.decl.name, @errorName(err) });
                     },
                     .never => {},
                 }
@@ -95,7 +107,7 @@ pub const ServiceTable = struct {
             size += 1;
         }
 
-        var srvArray = try env.allocator.alloc(Service, size);
+        var srvArray = try env.allocator.alloc(ServiceData, size);
         errdefer env.allocator.free(srvArray);
 
         var i: usize = 0;
@@ -107,10 +119,26 @@ pub const ServiceTable = struct {
             const absPath = try std.fs.path.join(env.allocator, &[_][]const u8{ dirName, entry.name });
             defer env.allocator.free(absPath);
 
-            srvArray[i] = try parser.fromToml(env, absPath);
+            srvArray[i] = .{
+                .decl = try parser.fromToml(env, absPath),
+                .running = false,
+                .pid = -1,
+            };
+            errdefer env.allocator.free(srvArray[i]);
             i += 1;
         }
 
-        return ServiceTable{ .services = srvArray[0..i], .env = env };
+        return ServiceTable{ .services = srvArray, .env = env };
+    }
+
+    pub fn format(self: ServiceTable, writer: *std.Io.Writer) !void {
+        try writer.print("services = [\n", .{});
+        var i: usize = 0;
+        for (self.services) |svc| {
+            if (i > 0) try writer.print(",\n", .{});
+            try svc.decl.format(writer);
+            i += 1;
+        }
+        try writer.print("]", .{});
     }
 };
