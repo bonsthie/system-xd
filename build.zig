@@ -20,15 +20,21 @@ const LIBXD_NAME = "xd";
 
 pub fn build(b: *Build) void {
     const target = b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .none });
-    const optimize = b.standardOptimizeOption(.{
-        .preferred_optimize_mode = .Debug
-    });
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
+
+    const toml = b.dependency("toml", .{}).module("toml");
+
+    const libxdImports: []const Import = &.{
+        .{ .name = "toml", .module = toml },
+    };
 
     const libxd = b.addModule(LIBXD_NAME, .{
         .root_source_file = b.path(LIBXD_ROOT_FILE),
         .target = target,
         .optimize = optimize,
+        .imports = libxdImports,
     });
+
 
     const imports: []const Import = &.{
         .{ .name = LIBXD_NAME, .module = libxd },

@@ -1,0 +1,15 @@
+name = "shell"
+path = "/bin/sh"
+
+argv = [
+    "/bin/sh",
+    "-c",
+    "echo hello"
+]
+
+envp = [
+    "PATH=/usr/bin:/bin",
+    "HOME=/home/bonsthie"
+]
+
+restart = "always"
