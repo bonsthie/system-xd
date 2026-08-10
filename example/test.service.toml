@@ -4,12 +4,12 @@ path = "/bin/sh"
 argv = [
     "/bin/sh",
     "-c",
-    "echo hello && sleep 10"
+    "echo hello $USER && sleep 10"
 ]
 
 envp = [
-    "PATH=/usr/bin:/bin",
-    "HOME=/home/bonsthie"
+	#"PATH=/usr/bin:/bin",
+    "USER=bonsthie"
 ]
 
 restart = "always"

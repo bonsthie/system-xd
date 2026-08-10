@@ -16,6 +16,7 @@ const Command = struct {
 };
 
 pub const commandMapping = ssm.StaticStringMap(Command).initComptime(.{
+    .{ "reload", Command{ .desc = "Reloads the service manager", .func = commands.reload } },
     .{ "daemon", Command{ .desc = "Starts a service daemon", .func = commands.daemon } },
     .{ "help", Command{ .desc = "Displays a nice help message", .func = commands.help } },
 });

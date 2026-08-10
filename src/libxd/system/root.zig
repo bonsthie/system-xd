@@ -6,6 +6,7 @@ pub const syscall = @import("syscall.zig");
 pub const process = @import("process.zig");
 pub const rtc = @import("rtc.zig");
 pub const service = @import("service/root.zig");
+pub const errno = @import("errno.zig");
 
 pub const Env = @import("env.zig").Env;
 pub const Cmdline = @import("cmdline.zig").Cmdline;

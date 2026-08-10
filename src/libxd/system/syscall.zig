@@ -5,7 +5,6 @@ const std = @import("std");
 const os = std.os;
 const linux = std.os.linux;
 pub const errno = @import("errno.zig");
-const wrapErrno = errno.wrapErrno;
 
 const mountMod = @import("mount.zig");
 pub const MountFlags = mountMod.Flags;
@@ -25,49 +24,49 @@ pub fn toPosixSlice(allocator: std.mem.Allocator, strings: []const []const u8) !
 }
 
 pub fn symlink(existing: [*:0]const u8, new: [*:0]const u8) !void {
-    _ = try wrapErrno(linux.symlink(existing, new));
+    _ = try errno.wrap(linux.symlink(existing, new));
 }
 
 pub fn remount(dir: [*:0]const u8, flags: u32) !void {
-    _ = try wrapErrno(linux.mount(@ptrFromInt(0), dir, @ptrFromInt(0), flags, 0));
+    _ = try errno.wrap(linux.mount(@ptrFromInt(0), dir, @ptrFromInt(0), flags, 0));
 }
 
 pub fn readlink(path: [*:0]const u8, buf: []u8) !usize {
     const rc = linux.readlink(path, buf.ptr, buf.len);
-    return try wrapErrno(rc);
+    return try errno.wrap(rc);
 }
 
 pub fn umount2(special: [*:0]const u8, flags: u32) !void {
-    _ = try wrapErrno(linux.umount2(special, flags));
+    _ = try errno.wrap(linux.umount2(special, flags));
 }
 
 pub fn chdir(path: [*:0]const u8) !void {
-    _ = try wrapErrno(linux.chdir(path));
+    _ = try errno.wrap(linux.chdir(path));
 }
 
 pub fn pivot_root(new_root: [*:0]const u8, put_old: [*:0]const u8) !void {
-    _ = try wrapErrno(linux.pivot_root(new_root, put_old));
+    _ = try errno.wrap(linux.pivot_root(new_root, put_old));
 }
 
 pub fn chroot(path: [*:0]const u8) !void {
-    _ = try wrapErrno(linux.chroot(path));
+    _ = try errno.wrap(linux.chroot(path));
 }
 
 pub fn waitpid(pid: linux.pid_t, status: *u32, flags: u32) !linux.pid_t {
-    const rc = try wrapErrno(linux.waitpid(pid, status, flags));
+    const rc = try errno.wrap(linux.waitpid(pid, status, flags));
     return @intCast(rc);
 }
 
 pub fn dup2(oldfd: i32, newfd: i32) !void {
-    _ = try wrapErrno(linux.dup2(oldfd, newfd));
+    _ = try errno.wrap(linux.dup2(oldfd, newfd));
 }
 
 pub fn execve(path: [*:0]const u8, argv: [*:null]const ?[*:0]const u8, envp: [*:null]const ?[*:0]const u8) !void {
-    _ = try wrapErrno(linux.execve(path, argv, envp));
+    _ = try errno.wrap(linux.execve(path, argv, envp));
 }
 
 pub fn ioctl(fd: linux.fd_t, request: u32, arg: usize) !void {
-    _ = try wrapErrno(linux.ioctl(fd, request, arg));
+    _ = try errno.wrap(linux.ioctl(fd, request, arg));
 }
 
 pub const SigHandlerFn = @TypeOf(@as(linux.Sigaction, undefined).handler.handler);
@@ -79,7 +78,7 @@ pub fn signal(sig: linux.SIG, handler: SigHandlerFn) !SigHandlerFn {
         .flags = 0,
     };
     var old: linux.Sigaction = undefined;
-    _ = try wrapErrno(linux.sigaction(sig, &act, &old));
+    _ = try errno.wrap(linux.sigaction(sig, &act, &old));
     return old.handler.handler;
 }
 
@@ -92,7 +91,7 @@ pub fn finit_module(fd: linux.fd_t, param_values: [*:0]const u8, flags: u32) !vo
         @intFromPtr(param_values),
         flags,
     );
-    _ = try wrapErrno(rc);
+    _ = try errno.wrap(rc);
 }
 
 const SYS_swapon = 167;
@@ -103,7 +102,7 @@ pub fn swapon(path: [*:0]const u8, flags: u32) !void {
         @intFromPtr(path),
         flags,
     );
-    _ = try wrapErrno(rc);
+    _ = try errno.wrap(rc);
 }
 
 const SYS_sethostname = 170;
@@ -114,7 +113,7 @@ pub fn sethostname(name: [*:0]const u8, len: usize) !void {
         @intFromPtr(name),
         @intCast(len),
     );
-    _ = try wrapErrno(rc);
+    _ = try errno.wrap(rc);
 }
 
 pub fn reboot(
@@ -123,11 +122,11 @@ pub fn reboot(
     command: linux.LINUX_REBOOT.CMD,
     arg: ?*const anyopaque,
 ) !void {
-    _ = try wrapErrno(linux.reboot(magic1, magic2, command, arg));
+    _ = try errno.wrap(linux.reboot(magic1, magic2, command, arg));
 }
 
 pub fn clock_settime(clock_id: linux.clockid_t, timestamp: *const linux.timespec) !void {
-    _ = try wrapErrno(linux.clock_settime(clock_id, timestamp));
+    _ = try errno.wrap(linux.clock_settime(clock_id, timestamp));
 }
 
 const SYS_sigsuspend = 130;

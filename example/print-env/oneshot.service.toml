@@ -1,0 +1,15 @@
+name = "print-time"
+path = "/bin/sh"
+
+argv = [
+    "/bin/sh",
+    "-c",
+    "/nix/store/mp8s10fwm685azvvv1qq7zyf7iajjlj8-coreutils-9.11/bin/env"
+]
+envp = [
+	"CUSTOM_ENV=hello"
+]
+clear_env = true
+
+restart = "never"
+enabled = true

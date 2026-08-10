@@ -1,4 +1,4 @@
-const wrapErrno = @import("errno.zig").wrapErrno;
+const errno = @import("errno.zig");
 const linux = @import("std").os.linux;
 
 pub const Flags = enum(u32) {
@@ -36,5 +36,5 @@ pub const Flags = enum(u32) {
 };
 
 pub fn mount(special: [*:0]const u8, dir: [*:0]const u8, fstype: ?[*:0]const u8, flags: u32, data: usize) !void {
-    _ = try wrapErrno(linux.mount(special, dir, fstype, flags, data));
+    _ = try errno.wrap(linux.mount(special, dir, fstype, flags, data));
 }

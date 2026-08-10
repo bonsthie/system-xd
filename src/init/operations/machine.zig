@@ -88,3 +88,54 @@ pub fn setHostname(env: Env, cmdline: ?*const Cmdline) !void {
     try syscall.sethostname(hostname_z, len);
     log.info("Hostname set to {s}", .{hostname_z});
 }
+
+pub fn setLocale(env: Env) !void {
+    const data = std.Io.Dir.readFileAlloc(.cwd(), env.io, "/etc/locale.conf", env.allocator, .unlimited) catch {
+        log.warn("Could not read /etc/locale.conf, setting default locale", .{});
+        env.environ.put("LANG", "C.UTF-8") catch {};
+        return;
+    };
+
+    var lines = std.mem.splitScalar(u8, data, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r");
+        if (line.len == 0 or line[0] == '#') continue;
+
+        if (!std.mem.startsWith(u8, line, "LC_")) {
+            std.log.warn("locale.conf can only set LC_ variables, skipping {s}", .{line});
+            continue;
+        }
+        const eq_pos = std.mem.indexOfScalar(u8, line, '=') orelse {
+            std.log.warn("skipping malformed line: {s}", .{line});
+            continue;
+        };
+
+        const key = std.mem.trim(u8, line[0..eq_pos], " \t");
+        const value = std.mem.trim(u8, line[eq_pos + 1 ..], " \t");
+
+        env.environ.put(key, value) catch {};
+    }
+}
+
+pub fn readInitRc(env: Env) !void {
+    const data = std.Io.Dir.readFileAlloc(.cwd(), env.io, "/etc/environ.xd", env.allocator, .unlimited) catch {
+        log.warn("Could not read /etc/environ.xd, skipping.", .{});
+        return;
+    };
+
+    var lines = std.mem.splitScalar(u8, data, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r");
+        if (line.len == 0 or line[0] == '#') continue;
+
+        const eq_pos = std.mem.indexOfScalar(u8, line, '=') orelse {
+            std.log.warn("skipping malformed line: {s}", .{line});
+            continue;
+        };
+
+        const key = std.mem.trim(u8, line[0..eq_pos], " \t");
+        const value = std.mem.trim(u8, line[eq_pos + 1 ..], " \t");
+
+        env.environ.put(key, value) catch {};
+    }
+}

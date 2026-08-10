@@ -50,9 +50,41 @@ pub const ServiceTable = struct {
             
             const cPath = try self.env.allocator.dupeZ(u8, svc.decl.path);
             const cArgv = try syscall.toPosixSlice(self.env.allocator, svc.decl.argv);
-            const cEnvp = try syscall.toPosixSlice(self.env.allocator, svc.decl.envp);
 
-            try syscall.execve(cPath, cArgv, cEnvp);
+            var environ: std.process.Environ.Map = undefined;
+            if (svc.decl.clear_env) {
+                environ = std.process.Environ.Map.init(self.env.allocator);
+                try environ.array_hash_map.ensureUnusedCapacity(self.env.allocator, svc.decl.envp.len);
+            } else {
+                environ = try self.env.environ.clone(self.env.allocator);
+            }
+            defer environ.deinit();
+
+            for (svc.decl.envp) |entry| {
+                const eq_pos = std.mem.indexOfScalar(u8, entry, '=') orelse {
+                    std.log.warn("skipping malformed entry (no '='): {s}", .{entry});
+                    continue;
+                };
+
+                const key = entry[0..eq_pos];
+                const value = entry[eq_pos + 1 ..];
+
+                try environ.put(key, value);
+            }
+
+            var result: std.ArrayList([]const u8) = .empty;
+            errdefer result.deinit(self.env.allocator);
+
+            var it = environ.iterator();
+            while (it.next()) |entry| {
+                const line = try std.fmt.allocPrint(self.env.allocator, "{s}={s}", .{ entry.key_ptr.*, entry.value_ptr.* });
+                try result.append(self.env.allocator, line);
+            }
+
+            const environSlice = try result.toOwnedSlice(self.env.allocator);
+            const cEnviron = try syscall.toPosixSlice(self.env.allocator, environSlice);
+
+            try syscall.execve(cPath, cArgv, cEnviron);
             os.exit(1);
         }
         svc.pid = @intCast(pid);
@@ -67,11 +99,13 @@ pub const ServiceTable = struct {
         return null;
     }
 
-    pub fn reap(self: *ServiceTable) void {
+    pub fn reap(self: *ServiceTable, allow_restart: bool) void {
         while (true) {
             var status: u32 = 0;
             const pid = syscall.waitpid(-1, &status, os.W.NOHANG) catch break;
             if (pid <= 0) break;
+
+            if (!allow_restart) continue;
 
             if (self.findByPid(pid)) |svc| {
                 log.warn("Service {s} (pid {d}) exited, status {d}", .{ svc.decl.name, pid, os.W.EXITSTATUS(status) });
@@ -87,6 +121,16 @@ pub const ServiceTable = struct {
                 log.debug("Reaped untracked pid {d}, status {d}", .{ pid, status });
             }
         }
+    }
+
+    pub fn shutdown(self: *ServiceTable) void {
+        for (self.services) |*svc| {
+            if (svc.running) {
+                log.warn("Shutting down service {s} (pid {d})", .{ svc.decl.name, svc.pid });
+                _ = os.kill(svc.pid, os.SIG.TERM);
+            }
+        }
+        self.reap(false);
     }
     
     pub fn deinit(self: *ServiceTable) void {

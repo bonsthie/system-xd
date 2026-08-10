@@ -41,7 +41,11 @@ fn isFirstPhase(proc_init: *const std.process.Init) bool {
 const network = @import("network");
 
 pub fn main(proc_init: std.process.Init) !void {
-    const env = xd.system.Env{ .io = proc_init.io, .allocator = proc_init.gpa };
+    const env = xd.system.Env{
+        .io = proc_init.io,
+        .allocator = proc_init.gpa,
+        .environ = proc_init.environ_map,
+    };
 
     if (isFirstPhase(&proc_init)) {
         format.header.printHeader();

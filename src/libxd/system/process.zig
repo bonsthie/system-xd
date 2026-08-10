@@ -3,7 +3,7 @@ const log = std.log.scoped(.process);
 const os = std.os.linux;
 const syscall = @import("syscall.zig");
 
-const wrapErrno = @import("errno.zig").wrapErrno;
+const errno = @import("errno.zig");
 
 const OpenMode = std.Io.Dir.OpenFileOptions.Mode;
 
@@ -29,7 +29,7 @@ pub const Config = struct {
 };
 
 fn writeTestTTY(fd: i32) !void {
-    const ret = wrapErrno(os.write(fd, "\x00\x00\x00\x00\n", 5)) catch {
+    const ret = errno.wrap(os.write(fd, "\x00\x00\x00\x00\n", 5)) catch {
         return error.WriteFuncFailedWriteTTY;
     };
 

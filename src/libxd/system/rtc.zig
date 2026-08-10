@@ -1,6 +1,6 @@
 const std = @import("std");
 const linux = std.os.linux;
-const wrapErrno = @import("errno.zig").wrapErrno;
+const errno = @import("errno.zig");
 
 pub const RtcTime = extern struct {
     tm_sec: i32,
@@ -18,7 +18,7 @@ const RTC_RD_TIME: u32 = 0x80247009;
 
 pub fn readTime(fd: linux.fd_t) !RtcTime {
     var t: RtcTime = std.mem.zeroes(RtcTime);
-    _ = try wrapErrno(linux.ioctl(fd, RTC_RD_TIME, @intFromPtr(&t)));
+    _ = try errno.wrap(linux.ioctl(fd, RTC_RD_TIME, @intFromPtr(&t)));
     return t;
 }
 

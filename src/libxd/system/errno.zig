@@ -1,7 +1,7 @@
 const std = @import("std");
 const os = std.os.linux;
 
-pub fn wrapErrno(err: anytype) anyerror!@TypeOf(err) {
+pub fn wrap(err: anytype) anyerror!@TypeOf(err) {
     // std.log.debug("wrapErrno {}", .{ err });
     const errno: usize = switch (@TypeOf(err)) {
         usize => err,

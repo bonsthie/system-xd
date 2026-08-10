@@ -10,6 +10,7 @@ pub const Service = struct {
     name: []const u8,
     path: []const u8,
     argv: []const []const u8 = &.{},
+    clear_env: bool = false,
     envp: []const []const u8 = &.{},
     restart: RestartPolicy = .always,
     tty: ?[]const u8 = null, // if set, open+claim this tty before exec

@@ -50,9 +50,11 @@ pub const Steps = [_]PhaseStep{
     .{ .msg = "Disable CAD syskey", .func = disableCadSyskey },
     .{ .msg = "Set system time", .func = setTime },
     .{ .msg = "Set system hostname", .func = setHostname },
+    .{ .msg = "Set system locale", .func = setLocale },
     .{ .msg = "Parse fstab", .func = parseFstab },
     .{ .msg = "Mount user filesystems", .func = mountUserFilesystems },
     .{ .msg = "Start login services", .func = startServices },
+    //TODO: replace startServices with a step that starts the daemon and keeps its pid
 };
 
 pub fn run(env: Env) !noreturn {
@@ -97,6 +99,10 @@ fn setHostname(ctx: *Ctx) !void {
     try operations.machine.setHostname(ctx.env, try ctx.requireCmdline());
 }
 
+fn setLocale(ctx: *Ctx) !void {
+    try operations.machine.setLocale(ctx.env);
+}
+
 fn parseFstab(ctx: *Ctx) !void {
     ctx.fstab = try system.fstab.load(ctx.env, fstab_path);
 }
@@ -106,6 +112,7 @@ fn mountUserFilesystems(ctx: *Ctx) !void {
 }
 
 fn startServices(ctx: *Ctx) !void {
+    //TODO: start `/sbin/xd daemon /etc/services.xd/`
     ctx.services = operations.login.start(ctx.env);
     operations.pid1.watchServices(try ctx.requireServices());
 }

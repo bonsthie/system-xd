@@ -12,3 +12,8 @@ pub const Message = struct {
     target: ?[]const u8 = null,
     state: bool = false,
 };
+
+pub const MessageReply = struct {
+    status: u8 = 0,
+    message: []u8 = "",
+};
