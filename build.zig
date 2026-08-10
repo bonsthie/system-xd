@@ -43,6 +43,11 @@ pub fn build(b: *Build) void {
         .{ .name = LIBXD_NAME, .module = libxd },
     };
 
+    const networkdImports: []const Import = &.{
+        .{ .name = LIBXD_NAME, .module = libxd },
+        .{ .name = "toml", .module = toml },
+    };
+
     const init = b.addExecutable(.{
         .name = INIT_NAME,
         .root_module = b.createModule(.{
@@ -71,7 +76,7 @@ pub fn build(b: *Build) void {
             .root_source_file = b.path(NETWORKD_ROOT_FILE),
             .target = target,
             .optimize = optimize,
-            .imports = imports,
+            .imports = networkdImports,
         }),
     });
     b.installArtifact(xd_networkd);
