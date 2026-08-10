@@ -2,7 +2,7 @@ const std = @import("std");
 const toml = @import("toml");
 
 const xd = @import("xd");
-const Config = @import("root.zig").Config;
+const Config = @import("config.zig");
 const Env = xd.system.Env;
 const Dir = std.Io.Dir;
 const Self = @This();
@@ -69,5 +69,9 @@ fn parseFile(self: *Self, dir: Dir, path: []const u8) !ParsedConfig {
     );
     defer self.env.allocator.free(content);
 
-    return parser.parseString(content);
+    const parsed = try parser.parseString(content);
+    errdefer parsed.deinit();
+
+    try parsed.value.validate();
+    return parsed;
 }
