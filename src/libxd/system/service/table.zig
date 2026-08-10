@@ -37,59 +37,46 @@ pub const ServiceTable = struct {
     }
 
     fn spawn(self: *ServiceTable, svc: *ServiceData) !void {
-        const pid = os.fork();
-        if (pid < 0) { // b-but zig has errors built into its type system!!!! yes and i don't have another month to spare so fuck you, C my beloved<3
-            log.err("Failed to fork for service {s}", .{svc.decl.name});
-            return error.ForkFailed;
-        }
-        if (pid == 0) {
-            _ = os.setsid();
-            if (svc.decl.tty) |tty_path| {
-                _ = process.newTTYFromName(self.env.io, tty_path, .read_write, true) catch os.exit(1);
-            }
-            
-            const cPath = try self.env.allocator.dupeZ(u8, svc.decl.path);
-            const cArgv = try syscall.toPosixSlice(self.env.allocator, svc.decl.argv);
+        var environ = try self.buildEnviron(&svc.decl);
+        defer environ.deinit();
 
-            var environ: std.process.Environ.Map = undefined;
-            if (svc.decl.clear_env) {
-                environ = std.process.Environ.Map.init(self.env.allocator);
-                try environ.array_hash_map.ensureUnusedCapacity(self.env.allocator, svc.decl.envp.len);
-            } else {
-                environ = try self.env.environ.clone(self.env.allocator);
-            }
-            defer environ.deinit();
+        const exec: process.Exec = .{ .native = .{
+            .allocator = self.env.allocator,
+            .command = svc.decl.path,
+            .args = svc.decl.argv,
+            .environ = &environ,
+        } };
+        const config: process.Config = .{};
 
-            for (svc.decl.envp) |entry| {
-                const eq_pos = std.mem.indexOfScalar(u8, entry, '=') orelse {
-                    std.log.warn("skipping malformed entry (no '='): {s}", .{entry});
-                    continue;
-                };
-
-                const key = entry[0..eq_pos];
-                const value = entry[eq_pos + 1 ..];
-
-                try environ.put(key, value);
-            }
-
-            var result: std.ArrayList([]const u8) = .empty;
-            errdefer result.deinit(self.env.allocator);
-
-            var it = environ.iterator();
-            while (it.next()) |entry| {
-                const line = try std.fmt.allocPrint(self.env.allocator, "{s}={s}", .{ entry.key_ptr.*, entry.value_ptr.* });
-                try result.append(self.env.allocator, line);
-            }
-
-            const environSlice = try result.toOwnedSlice(self.env.allocator);
-            const cEnviron = try syscall.toPosixSlice(self.env.allocator, environSlice);
-
-            try syscall.execve(cPath, cArgv, cEnviron);
-            os.exit(1);
-        }
-        svc.pid = @intCast(pid);
+        svc.pid = if (svc.decl.tty) |tty|
+            try process.spawnFromName(self.env.io, tty, &exec, &config)
+        else
+            try process.spawn(&exec, &config);
         svc.running = true;
         log.info("Started service {s} (pid {d})", .{ svc.decl.name, svc.pid });
+    }
+
+    fn buildEnviron(self: *const ServiceTable, decl: *const Service) !std.process.Environ.Map {
+        var environ: std.process.Environ.Map = if (decl.clear_env)
+            std.process.Environ.Map.init(self.env.allocator)
+        else
+            try self.env.environ.clone(self.env.allocator);
+        errdefer environ.deinit();
+
+        if (decl.clear_env) {
+            try environ.array_hash_map.ensureUnusedCapacity(self.env.allocator, decl.envp.len);
+        }
+
+        for (decl.envp) |entry| {
+            const eq_pos = std.mem.indexOfScalar(u8, entry, '=') orelse {
+                log.warn("skipping malformed environment entry (no '='): {s}", .{entry});
+                continue;
+            };
+
+            try environ.put(entry[0..eq_pos], entry[eq_pos + 1 ..]);
+        }
+
+        return environ;
     }
 
     fn findByPid(self: *ServiceTable, pid: os.pid_t) ?*ServiceData {
@@ -132,7 +119,7 @@ pub const ServiceTable = struct {
         }
         self.reap(false);
     }
-    
+
     pub fn deinit(self: *ServiceTable) void {
         self.env.allocator.free(self.services);
     }

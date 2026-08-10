@@ -10,19 +10,6 @@ const mountMod = @import("mount.zig");
 pub const MountFlags = mountMod.Flags;
 pub const mount = mountMod.mount;
 
-pub fn toPosixSlice(allocator: std.mem.Allocator, strings: []const []const u8) ![:null]?[*:0] u8 {
-    const len = strings.len;
-    var ptrs = try allocator.allocSentinel(?[*:0]u8, len, null);
-    errdefer allocator.free(ptrs);
-
-    for (strings, 0..) |s, i| {
-        ptrs[i] = try allocator.dupeZ(u8, s);
-        errdefer allocator.free(ptrs[i]);
-    }
-
-    return ptrs;
-}
-
 pub fn symlink(existing: [*:0]const u8, new: [*:0]const u8) !void {
     _ = try errno.wrap(linux.symlink(existing, new));
 }
