@@ -5,15 +5,22 @@ pub const MessageType = enum {
     status,
     start,
     stop,
+
+    pub fn hasTarget(self: MessageType) bool {
+        return switch (self) {
+            .status, .start, .stop => true,
+            else => false,
+        };
+    }
 };
 
 pub const Message = struct {
     msg_type: MessageType,
-    target: ?[]const u8 = null,
     state: bool = false,
+    message: ?[]const u8 = null,
 };
 
 pub const MessageReply = struct {
     status: u8 = 0,
-    message: []u8 = "",
+    message: ?[]const u8 = null,
 };

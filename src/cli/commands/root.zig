@@ -3,10 +3,10 @@ const os = std.os.linux;
 const xd = @import("xd");
 const errno = xd.system.errno;
 const Env = xd.system.Env;
-const message = @import("../daemon/root.zig").message;
-const Message = message.Message;
-const MessageReply = message.MessageReply;
-const MessageType = message.MessageType;
+const messageModule = @import("../daemon/root.zig").message;
+const Message = messageModule.Message;
+const MessageReply = messageModule.MessageReply;
+const MessageType = messageModule.MessageType;
 const SOCKET_PATH = @import("../daemon/server.zig").SOCKET_PATH;
 
 // Commands
@@ -16,7 +16,7 @@ pub const reload = @import("reload.zig").reload;
 
 // Helpers
 
-pub fn send(_: Env, msg: Message) !void {
+pub fn send(env: Env, msg: Message) !void {
     const sock_fd_raw = os.socket(os.AF.UNIX, os.SOCK.SEQPACKET, 0);
     const sock_fd: i32 = @intCast(try errno.wrap(sock_fd_raw));
     defer _ = os.close(sock_fd);
@@ -28,18 +28,36 @@ pub fn send(_: Env, msg: Message) !void {
     const addr_len: u32 = @intCast(@offsetOf(os.sockaddr.un, "path") + SOCKET_PATH.len + 1);
     _ = try errno.wrap(os.connect(sock_fd, @ptrCast(&addr), addr_len));
 
-    const msg_bytes = std.mem.asBytes(&msg);
-    const n_written = os.write(sock_fd, msg_bytes.ptr, msg_bytes.len);
-    _ = try errno.wrap(n_written);
+    {
+        const msg_bytes = std.mem.asBytes(&msg);
+        _ = try errno.wrap(os.write(sock_fd, msg_bytes.ptr, msg_bytes.len));
 
-    var reply: MessageReply = undefined;
-    const reply_bytes = std.mem.asBytes(&reply);
-    const n_read = os.read(sock_fd, reply_bytes.ptr, reply_bytes.len);
-    _ = try errno.wrap(n_read);
+        if (msg.message != null) {
+            const len_bytes = std.mem.asBytes(&msg.message.?.len);
+            _ = try errno.wrap(os.write(sock_fd, len_bytes.ptr, len_bytes.len));
+            _ = try errno.wrap(os.write(sock_fd, msg.message.?.ptr, msg.message.?.len));
+        }
+    }
 
-    const msg_len = std.mem.indexOfScalar(u8, reply.message, 0) orelse reply.message.len;
-    std.log.info("daemon replied: status={d} message={s}", .{
-        reply.status,
-        reply.message[0..msg_len],
-    });
+    {
+        var reply = std.mem.zeroes(MessageReply);
+        defer if (reply.message) |m| env.allocator.free(m);
+
+        const reply_bytes = std.mem.asBytes(&reply);
+        _ = try errno.wrap(os.read(sock_fd, reply_bytes.ptr, reply_bytes.len));
+
+        if (reply.message != null) {
+            var len: usize = 0;
+            const len_bytes = std.mem.asBytes(&len);
+            _ = try errno.wrap(os.read(sock_fd, len_bytes.ptr, len_bytes.len));
+            const message = try env.allocator.alloc(u8, len);
+            _ = try errno.wrap(os.read(sock_fd, message.ptr, len));
+            reply.message = message;
+        }
+
+        std.log.info("daemon replied: status={d} message={s}", .{
+            reply.status,
+            reply.message orelse "null",
+        });
+    }
 }

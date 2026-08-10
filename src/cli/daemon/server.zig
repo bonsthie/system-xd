@@ -9,10 +9,10 @@ const Env = xd.system.Env;
 const ServiceTable = service.ServiceTable;
 const syscall = xd.system.syscall;
 
-const message = @import("message.zig");
-const Message = message.Message;
-const MessageReply = message.MessageReply;
-const MessageType = message.MessageType;
+const messageModule = @import("message.zig");
+const Message = messageModule.Message;
+const MessageReply = messageModule.MessageReply;
+const MessageType = messageModule.MessageType;
 
 var current_server: ?*DaemonServer = null;
 
@@ -67,47 +67,73 @@ pub const DaemonServer = struct {
         log.debug("Shutdown complete", .{});
     }
 
-    fn handleClient(self: *DaemonServer, client_fd: i32) !void {
-        var msg: Message = undefined;
-        const msg_bytes = std.mem.asBytes(&msg);
-
-        //TODO: i was tired okay
-        // make sure the buffers sent don't contain string addresses but rather actual strings
-
-        while (true) {
-            const n_read = os.read(client_fd, msg_bytes.ptr, msg_bytes.len);
-            const signed: isize = @bitCast(n_read);
+    fn read(client_fd: i32, buf: [*]u8, size: usize) !usize {
+        var n_read: usize = 0;
+        while (n_read < size) {
+            const signed: isize = @intCast(os.read(client_fd, buf[n_read..], size - n_read));
+            if (signed == 0) break;
             if (signed < 0) {
                 const err_num: usize = @intCast(-signed);
                 if (err_num == @intFromEnum(os.E.INTR)) continue;
                 std.log.err("read failed, errno={d}", .{err_num});
                 return error.SyscallFailed;
             }
-            break;
+            n_read += @intCast(signed);
         }
+        return n_read;
+    }
 
-        std.log.info("received message: msg_type={d}", .{
-            msg.msg_type,
-        });
-
-        var reply = std.mem.zeroes(MessageReply);
-        reply.status = 0;
-        reply.message = try self.env.allocator.dupe(u8, "Hello, world!");
-        defer self.env.allocator.free(reply.message);
-
-        const reply_bytes = std.mem.asBytes(&reply);
-   
-        while (true) {
-            const n_written = os.write(client_fd, reply_bytes.ptr, reply_bytes.len);
-            const signed: isize = @bitCast(n_written);
+    fn write(client_fd: i32, buf: [*]const u8, size: usize) !usize {
+        var n_written: usize = 0;
+        while (n_written < size) {
+            const signed: isize = @bitCast(os.write(client_fd, buf[n_written..], size - n_written));
+            if (signed == 0) break;
             if (signed < 0) {
                 const err_num: usize = @intCast(-signed);
                 if (err_num == @intFromEnum(os.E.INTR)) continue;
                 std.log.err("write failed, errno={d}", .{err_num});
                 return error.SyscallFailed;
             }
-            break;
+            n_written += @intCast(signed);
         }
+        return n_written;
+    }
+
+    fn handleClient(self: *DaemonServer, client_fd: i32) !void {
+        var msg: Message = std.mem.zeroes(Message);
+        defer if (msg.message) |m| self.env.allocator.free(m);
+
+        const msg_bytes = std.mem.asBytes(&msg.message);
+        _ = try read(client_fd, msg_bytes.ptr, msg_bytes.len);
+
+        if (msg.message != null) {
+            var len: usize = 0;
+            const len_bytes = std.mem.asBytes(&len);
+            _ = try read(client_fd, len_bytes.ptr, len_bytes.len);
+            const message = try self.env.allocator.alloc(u8, len);
+            _ = try read(client_fd, message.ptr, len);
+            msg.message = message;
+        }
+
+        const reply = self.processMessage(msg);
+
+        const replyBytes = std.mem.asBytes(&reply);
+        _ = try write(client_fd, replyBytes.ptr, replyBytes.len);
+
+        if (reply.message != null) {
+            const len_bytes = std.mem.asBytes(&reply.message.?.len);
+            _ = try write(client_fd, len_bytes.ptr, len_bytes.len);
+            _ = try write(client_fd, reply.message.?.ptr, reply.message.?.len);
+        }
+    }
+
+    fn processMessage(self: *DaemonServer, msg: Message) MessageReply {
+        _ = self;
+        _ = msg;
+        return .{
+            .status = 0,
+            .message = "henlo",
+        };
     }
 
     pub fn deinit(self: *DaemonServer) void {
