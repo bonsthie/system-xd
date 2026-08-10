@@ -6,7 +6,7 @@ const config = @import("../config/root.zig");
 const default = @import("../default.zig");
 
 pub fn load(env: Env, args: []const []const u8) !void {
-    var loader = config.ConfigLoader.init(env);
+    var loader = config.Loader.init(env);
     defer loader.deinit();
 
     if (args.len == 0) {
