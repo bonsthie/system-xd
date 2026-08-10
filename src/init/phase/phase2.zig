@@ -105,7 +105,7 @@ fn setLocale(ctx: *Ctx) !void {
 }
 
 fn readInitRc(ctx: *Ctx) !void {
-    try operations.initrc.read(ctx.env);
+    try operations.machine.readInitRc(ctx.env);
 }
 
 fn parseFstab(ctx: *Ctx) !void {
