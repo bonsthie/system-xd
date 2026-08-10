@@ -14,6 +14,10 @@ const CLI_DIR = SRC_DIR ++ "cli/";
 const CLI_ROOT_FILE = CLI_DIR ++ "main.zig";
 const CLI_NAME = "xd";
 
+const NETWORKD_DIR = SRC_DIR ++ "networkd/";
+const NETWORKD_ROOT_FILE = NETWORKD_DIR ++ "main.zig";
+const NETWORKD_NAME = "xd-networkd";
+
 const LIBXD_DIR = SRC_DIR ++ "libxd/";
 const LIBXD_ROOT_FILE = LIBXD_DIR ++ "root.zig";
 const LIBXD_NAME = "xd";
@@ -60,4 +64,16 @@ pub fn build(b: *Build) void {
         }),
     });
     b.installArtifact(cli);
+
+
+    const xd_networkd = b.addExecutable(.{
+        .name = NETWORKD_NAME,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path(NETWORKD_ROOT_FILE),
+            .target = target,
+            .optimize = optimize,
+            .imports = imports,
+        }),
+    });
+    b.installArtifact(xd_networkd);
 }

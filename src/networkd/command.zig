@@ -6,12 +6,8 @@ const ssm = std.static_string_map;
 const xd = @import("xd");
 const Env = xd.system.Env;
 
-const commands = @import("commands/root.zig");
-
 const Command = xd.command.Command;
 pub const commandMapping = ssm.StaticStringMap(Command).initComptime(.{
-    .{ "reload", Command{ .desc = "Reloads the service manager", .func = commands.reload } },
-    .{ "daemon", Command{ .desc = "Starts a service daemon", .func = commands.daemon } },
     .{ "help", Command{ .desc = xd.command.defaults.help.desc, .func = help } },
 });
 
@@ -20,5 +16,5 @@ pub fn run(env: Env, name: []const u8, args: []const []const u8) !void {
 }
 
 fn help(env: Env, args: []const []const u8) !void {
-    try xd.command.defaults.help.run("xd", commandMapping, env, args);
+    try xd.command.defaults.help.run("xd-networkd", commandMapping, env, args);
 }
