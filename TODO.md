@@ -1,8 +1,8 @@
 # TODO (the second coming)
 
-## CLI
-- [ ] Locale management
-  - Read `/etc/locale.conf` as environment variables and set them in services
+## init
+- [ ] Replace the `startServices` step with starting the daemon and keeping its pid
+- [ ] In `pid1.zig#intoRebootSyscall`, send SIGINT to the daemon to start shutting down, wait a few seconds, and then send SIGQUIT if its not dead
 
 ## Services:
 - [ ] Cron

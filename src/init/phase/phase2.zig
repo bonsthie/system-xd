@@ -51,6 +51,7 @@ pub const Steps = [_]PhaseStep{
     .{ .msg = "Set system time", .func = setTime },
     .{ .msg = "Set system hostname", .func = setHostname },
     .{ .msg = "Set system locale", .func = setLocale },
+    .{ .msg = "Read /etc/environ.xd", .func = readInitRc },
     .{ .msg = "Parse fstab", .func = parseFstab },
     .{ .msg = "Mount user filesystems", .func = mountUserFilesystems },
     .{ .msg = "Start login services", .func = startServices },
@@ -101,6 +102,10 @@ fn setHostname(ctx: *Ctx) !void {
 
 fn setLocale(ctx: *Ctx) !void {
     try operations.machine.setLocale(ctx.env);
+}
+
+fn readInitRc(ctx: *Ctx) !void {
+    try operations.initrc.read(ctx.env);
 }
 
 fn parseFstab(ctx: *Ctx) !void {
