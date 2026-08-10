@@ -11,7 +11,6 @@ const SOCKET_PATH = @import("../daemon/server.zig").SOCKET_PATH;
 
 // Commands
 
-pub const help = @import("help.zig").help;
 pub const daemon = @import("daemon.zig").daemon;
 pub const reload = @import("reload.zig").reload;
 
