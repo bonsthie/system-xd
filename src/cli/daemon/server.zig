@@ -96,7 +96,7 @@ pub const DaemonServer = struct {
         defer self.env.allocator.free(reply.message);
 
         const reply_bytes = std.mem.asBytes(&reply);
-
+   
         while (true) {
             const n_written = os.write(client_fd, reply_bytes.ptr, reply_bytes.len);
             const signed: isize = @bitCast(n_written);
