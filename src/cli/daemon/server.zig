@@ -109,7 +109,7 @@ pub const DaemonServer = struct {
         var msg: Message = std.mem.zeroes(Message);
         defer if (msg.message) |m| self.env.allocator.free(m);
 
-        const msg_bytes = std.mem.asBytes(&msg.message);
+        const msg_bytes = std.mem.asBytes(&msg);
         const nread = try read(client_fd, msg_bytes.ptr, msg_bytes.len);
 
 
