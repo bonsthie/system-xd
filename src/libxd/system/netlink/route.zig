@@ -61,10 +61,9 @@ fn nextSequence(self: *Self) u32 {
     return self.sequence;
 }
 
-pub fn setLinkUp(self: *Self, link: Link) !void {
-    _ = self;
-    _ = link;
-    return error.NotImplemented;
+pub fn setLink(self: *Self, link: Link) !void {
+    const sequence = self.nextSequence();
+    return link.set(self.fd, sequence);
 }
 
 pub fn addAddress(self: *Self, link: Link, options: AddressOptions) !void {
