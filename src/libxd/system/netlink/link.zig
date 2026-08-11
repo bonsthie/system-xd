@@ -42,6 +42,63 @@ pub fn get(fd: abi.FileDescriptor, sequence: u32, name: []const u8) !Self {
     return receive(fd, sequence);
 }
 
+pub fn set(self: Self, fd: abi.FileDescriptor, sequence: u32) !void {
+    const index = std.math.cast(c_int, self.index) orelse {
+        return error.InvalidLinkIndex;
+    };
+    if (index == 0) return error.InvalidLinkIndex;
+
+    const link_up: u32 = @as(u16, @bitCast(std.os.linux.IFF{
+        .UP = true,
+    }));
+
+    const Request = nl_message.FixedBuilder(abi.LinkHeader, .{
+        .type = NameAttribute,
+        .count = 0,
+    });
+    var request = try Request.init(
+        .RTM_SETLINK,
+        abi.REQUEST | abi.ACK,
+        sequence,
+    ).withPayload(.{
+        .family = abi.UNSPEC,
+        .type = 0,
+        .index = index,
+        .flags = link_up,
+        .change = link_up,
+    });
+
+    try request.send(fd);
+
+    return receiveAck(fd, sequence);
+}
+
+fn receiveAck(fd: abi.FileDescriptor, sequence: u32) !void {
+    var response: [64 * 1024]u8 = undefined;
+
+    while (true) {
+        const response_length = try syscall.recvfrom(
+            fd,
+            &response,
+            0,
+            null,
+            null,
+        );
+        if (response_length == 0) return error.MalformedMessage;
+
+        var reader = nl_message.Reader.init(response[0..response_length]);
+        while (try reader.next()) |message| {
+            if (message.header.seq != sequence) continue;
+
+            return switch (message.header.type) {
+                .ERROR => message.checkError(),
+                .OVERRUN => error.ResponseOverrun,
+                else => error.UnexpectedMessage,
+            };
+        }
+    }
+}
+
 fn receive(fd: abi.FileDescriptor, sequence: u32) !Self {
     var response: [64 * 1024]u8 = undefined;
 
