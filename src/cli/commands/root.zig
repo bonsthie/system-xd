@@ -1,5 +1,6 @@
 const std = @import("std");
 const os = std.os.linux;
+const log = std.log.scoped(.socket);
 const xd = @import("xd");
 const errno = xd.system.errno;
 const Env = xd.system.Env;
@@ -12,7 +13,12 @@ const SOCKET_PATH = @import("../daemon/server.zig").SOCKET_PATH;
 // Commands
 
 pub const daemon = @import("daemon.zig").daemon;
+pub const panic = @import("panic.zig").panic;
 pub const reload = @import("reload.zig").reload;
+pub const start = @import("start.zig").start;
+pub const stop = @import("stop.zig").stop;
+pub const restart = @import("restart.zig").restart;
+pub const status = @import("status.zig").status;
 
 // Helpers
 
@@ -30,12 +36,15 @@ pub fn send(env: Env, msg: Message) !void {
 
     {
         const msg_bytes = std.mem.asBytes(&msg);
-        _ = try errno.wrap(os.write(sock_fd, msg_bytes.ptr, msg_bytes.len));
+        var nwritten = try errno.wrap(os.write(sock_fd, msg_bytes.ptr, msg_bytes.len));
+        log.debug("Sent message (sz={}): {{ .type = {any}, .state = {} }}", .{nwritten, msg.msg_type, msg.state});
 
         if (msg.message != null) {
             const len_bytes = std.mem.asBytes(&msg.message.?.len);
-            _ = try errno.wrap(os.write(sock_fd, len_bytes.ptr, len_bytes.len));
-            _ = try errno.wrap(os.write(sock_fd, msg.message.?.ptr, msg.message.?.len));
+            nwritten = try errno.wrap(os.write(sock_fd, len_bytes.ptr, len_bytes.len));
+            log.debug("Sent string len (sz={})", .{nwritten});
+            nwritten = try errno.wrap(os.write(sock_fd, msg.message.?.ptr, msg.message.?.len));
+            log.debug("Sent string (sz={}) '{s}'", .{nwritten, msg.message.?});
         }
     }
 

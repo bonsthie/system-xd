@@ -15,7 +15,7 @@ pub const Ctx = struct {
     env: Env,
     cmdline: ?Cmdline = null,
     fstab: ?Fstab = null,
-    services: ?ServiceTable = null,
+    daemon_pid: ?os.pid_t = null,
 
     pub fn init(env: Env) Ctx {
         return .{ .env = env };
@@ -34,8 +34,8 @@ pub const Ctx = struct {
         return if (self.fstab) |*fstab| fstab else error.FstabNotLoaded;
     }
 
-    fn requireServices(self: *Ctx) !*ServiceTable {
-        return if (self.services) |*services| services else error.ServicesNotStarted;
+    fn requireDaemon(self: *Ctx) !os.pid_t {
+        return self.daemon_pid orelse error.DaemonNotStarted;
     }
 };
 
@@ -118,6 +118,5 @@ fn mountUserFilesystems(ctx: *Ctx) !void {
 
 fn startServices(ctx: *Ctx) !void {
     //TODO: start `/sbin/xd daemon /etc/services.xd/`
-    ctx.services = operations.login.start(ctx.env);
-    operations.pid1.watchServices(try ctx.requireServices());
+    operations.pid1.watchDaemon(try ctx.requireDaemon());
 }

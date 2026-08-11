@@ -1,0 +1,5 @@
+name = "tty2-login"
+path = "/bin/busybox"
+argv = ["/bin/busybox", "login"]
+tty = "/dev/tty2"
+restart = "always"

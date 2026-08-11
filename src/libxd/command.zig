@@ -8,6 +8,7 @@ const Env = @import("system/env.zig").Env;
 pub const Command = struct {
     desc: []const u8,
     func: ?*const fn (env: Env, args: []const []const u8) anyerror!void,
+    hidden: bool = false,
 };
 
 pub const CommandMap = std.StaticStringMap(Command);
@@ -24,7 +25,10 @@ pub const defaults = struct {
         ) !void {
             log.info("Usage: {s} <command> [<args>]", .{program_name});
             for (command_mapping.keys()) |name| {
-                log.info("\t{s}\t\t{s}", .{ name, command_mapping.get(name).?.desc });
+                if (command_mapping.get(name)) |cmd| {
+                    if (cmd.hidden) continue;
+                    log.info("\t{s}\t\t{s}", .{ name, cmd.desc });
+                }
             }
         }
     };

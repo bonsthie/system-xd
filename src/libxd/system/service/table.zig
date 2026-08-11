@@ -86,6 +86,13 @@ pub const ServiceTable = struct {
         return null;
     }
 
+    pub fn findByName(self: *ServiceTable, name: []const u8) ?*ServiceData {
+        for (self.services) |*svc| {
+            if (std.mem.eql(u8, svc.decl.name, name)) return svc;
+        }
+        return null;
+    }
+
     pub fn reap(self: *ServiceTable, allow_restart: bool) void {
         while (true) {
             var status: u32 = 0;
@@ -150,15 +157,22 @@ pub const ServiceTable = struct {
             const absPath = try std.fs.path.join(env.allocator, &[_][]const u8{ dirName, entry.name });
             defer env.allocator.free(absPath);
 
-            srvArray[i] = .{
-                .decl = parser.fromToml(env, absPath) catch {
-                    log.warn("Failed to parse service {s}", .{absPath});
-                    continue;
-                },
-                .running = false,
-                .pid = -1,
+            const decl = parser.fromToml(env, absPath) catch {
+                log.warn("Failed to parse service {s}", .{absPath});
+                continue;
             };
-            errdefer env.allocator.free(srvArray[i].decl);
+
+            var good = true;
+            for (0..i) |j| {
+                if (std.mem.eql(u8, srvArray[j].decl.name, decl.name)) {
+                    log.warn("Service named {s} already exists", .{decl.name});
+                    good = false;
+                    break;
+                }
+            }
+            if (!good) continue;
+
+            srvArray[i] = .{ .decl = decl, .running = false, .pid = -1 };
             i += 1;
         }
         size = i;

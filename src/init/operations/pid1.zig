@@ -6,7 +6,7 @@ const system = @import("xd").system;
 const ServiceTable = system.service.ServiceTable;
 const syscall = system.syscall;
 
-var active_services: ?*ServiceTable = null;
+var daemon_pid: ?os.pid_t = null;
 
 fn intoRebootSyscall(value: os.LINUX_REBOOT.CMD) void {
     //TODO: send SIGINT to `xd daemon` to trigger a shutdown
@@ -49,8 +49,8 @@ pub fn disableCad() !void {
     _ = try syscall.reboot(.MAGIC1, .MAGIC2, .CAD_OFF, null);
 }
 
-pub fn watchServices(services: *ServiceTable) void {
-    active_services = services;
+pub fn watchDaemon(pid: os.pid_t) void {
+    daemon_pid = pid;
 }
 
 pub fn wait() noreturn {

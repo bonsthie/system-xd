@@ -12,3 +12,4 @@ zig-out/
 *.img
 *subject.*
 services-test
+/run

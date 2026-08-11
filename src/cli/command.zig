@@ -11,6 +11,11 @@ const commands = @import("commands/root.zig");
 const Command = xd.command.Command;
 pub const commandMapping = ssm.StaticStringMap(Command).initComptime(.{
     .{ "reload", Command{ .desc = "Reloads the service manager", .func = commands.reload } },
+    .{ "start", Command{ .desc = "Starts a service", .func = commands.start } },
+    .{ "stop", Command{ .desc = "Stops a service", .func = commands.stop } },
+    .{ "status", Command{ .desc = "Gets the status of a service", .func = commands.status } },
+    .{ "restart", Command{ .desc = "Restarts a service", .func = commands.restart } },
+    .{ "panic", Command{ .desc = ":trollface:", .func = commands.panic, .hidden = true } },
     .{ "daemon", Command{ .desc = "Starts a service daemon", .func = commands.daemon } },
     .{ "help", Command{ .desc = xd.command.defaults.help.desc, .func = help } },
 });

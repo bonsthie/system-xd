@@ -5,6 +5,7 @@ pub const MessageType = enum {
     status,
     start,
     stop,
+    panic,
 
     pub fn hasTarget(self: MessageType) bool {
         return switch (self) {
@@ -21,6 +22,6 @@ pub const Message = struct {
 };
 
 pub const MessageReply = struct {
-    status: u8 = 0,
+    status: u32 = 0,
     message: ?[]const u8 = null,
 };
