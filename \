@@ -1,0 +1,60 @@
+const std = @import("std");
+const abi = @import("abi.zig");
+const syscall = @import("../syscall.zig");
+
+const RESPONSE_SIZE = 64 * 1024;
+
+pub fn WireWithAttributes(comptime Payload: type, comptime Attributes: []type) type {
+    return extern struct {
+        header: abi.MessageHeader,
+        payload: Payload,
+        attributes: Attributes,
+    };
+}
+
+pub fn Builder(comptime Payload: type, comptime Attributes: []type) type {
+    const Message = WireWithAttributes(Payload, Attributes);
+    const MessageSize = @sizeOf(Message);
+
+    return struct {
+        const Self = @This();
+        message: Message,
+
+        pub fn init(self: *Self, NLType: abi.MessageType, flags: u16, sequence: u32) Self {
+            self.message.header = .{
+                .len = MessageSize,
+                .type = NLType,
+                .flags = flags,
+                .seq = sequence,
+                .pid = 0,
+            };
+            return self;
+        }
+
+        pub fn withPayload(self: *Self, payload: Payload) Self {
+            // replace by std copy forward
+            self.message.payload = payload;
+            return self;
+        }
+
+        pub fn withAttributes(self: *Self, attributes: Attributes) Self {
+            // replace by std copy forward
+            self.message.attributes = attributes;
+            return self;
+        }
+
+        pub fn send() !i32 {}
+    };
+}
+
+fn attributeNumber(attribute_type: anytype) u16 {
+    return switch (@typeInfo(@TypeOf(attribute_type))) {
+        .@"enum" => @intCast(@intFromEnum(attribute_type)),
+        .int, .comptime_int => @intCast(attribute_type),
+        else => @compileError("netlink attribute type must be an enum or integer"),
+    };
+}
+
+fn alignLength(length: usize) usize {
+    return std.mem.alignForward(usize, length, abi.ALIGNMENT);
+}

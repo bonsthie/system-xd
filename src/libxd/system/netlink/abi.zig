@@ -30,24 +30,3 @@ pub const NETLINK = linux.AF.NETLINK;
 pub const RAW = linux.SOCK.RAW;
 pub const CLOEXEC = linux.SOCK.CLOEXEC;
 pub const ROUTE = linux.NETLINK.ROUTE;
-
-pub fn Message(comptime Payload: type) type {
-    return extern struct {
-        header: MessageHeader,
-        payload: Payload,
-    };
-}
-
-pub fn MessageWithAttribute(comptime Payload: type, comptime value_size: usize) type {
-    return extern struct {
-        message: Message(Payload),
-        attribute: Attribute,
-        value: [value_size]u8,
-    };
-}
-
-pub const LinkMessage = Message(LinkHeader);
-pub const LinkNameRequest = MessageWithAttribute(
-    LinkHeader,
-    INTERFACE_NAME_SIZE,
-);
