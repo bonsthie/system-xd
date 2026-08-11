@@ -112,7 +112,6 @@ pub const DaemonServer = struct {
         const msg_bytes = std.mem.asBytes(&msg);
         const nread = try read(client_fd, msg_bytes.ptr, msg_bytes.len);
 
-
         log.debug("Received message (sz={}): {{ .type = {any}, .state = {} }}", .{nread, msg.msg_type, msg.state});
 
         if (msg.message != null) {
@@ -180,13 +179,14 @@ pub const DaemonServer = struct {
         }
         if (msg.msg_type == .start or msg.msg_type == .stop) {
             if (status and msg.msg_type == .stop) {
-                srv.running = false;
-                srv.pid = -1;
+                self.services.stop(srv);
                 return ok(.{ .message = "Service stopped" });
             }
             if (!status and msg.msg_type == .start) {
-                srv.running = true;
-                srv.pid = -1;
+                self.services.spawn(srv) catch |e| {
+                    log.err("Failed to spawn service {s}: {s}", .{ srv.decl.name, @errorName(e) });
+                    return err(.{ .message = "Failed to start service" });
+                };
                 return ok(.{ .message = "Service started" });
             }
             return err(.{ .message = "Service already in desired state" });

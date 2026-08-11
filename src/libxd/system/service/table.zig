@@ -12,6 +12,7 @@ pub const RestartPolicy = service.RestartPolicy;
 pub const Service = service.Service;
 
 const SERVICE_FILE_SUFFIX = ".service.toml";
+const TIMEOUT_NS: i64 = 10 * std.time.ns_per_s;
 
 pub const ServiceData = struct {
     decl: Service,
@@ -31,12 +32,11 @@ pub const ServiceTable = struct {
                 i += 1;
                 continue;
             };
-            svc.running = true;
             i += 1;
         }
     }
 
-    fn spawn(self: *ServiceTable, svc: *ServiceData) !void {
+    pub fn spawn(self: *ServiceTable, svc: *ServiceData) !void {
         var environ = try self.buildEnviron(&svc.decl);
         defer environ.deinit();
 
@@ -117,14 +117,66 @@ pub const ServiceTable = struct {
         }
     }
 
-    pub fn shutdown(self: *ServiceTable) void {
-        for (self.services) |*svc| {
-            if (svc.running) {
-                log.warn("Shutting down service {s} (pid {d})", .{ svc.decl.name, svc.pid });
-                _ = os.kill(svc.pid, os.SIG.TERM);
-            }
+    pub fn stop(self: *ServiceTable, svc: *ServiceData) void {
+        if (!svc.running or svc.pid <= 0) return;
+
+        log.info("Stopping service {s} (pid {d})", .{ svc.decl.name, svc.pid });
+        _ = os.kill(svc.pid, os.SIG.TERM);
+
+        if (!self.waitForExit(svc, TIMEOUT_NS)) {
+            log.warn("Service {s} (pid {d}) did not exit in time, sending SIGKILL", .{ svc.decl.name, svc.pid });
+            _ = os.kill(svc.pid, os.SIG.KILL);
+            _ = self.waitForExit(svc, TIMEOUT_NS);
         }
-        self.reap(false);
+
+        svc.running = false;
+        svc.pid = -1;
+    }
+
+    fn waitForExit(self: *ServiceTable, svc: *ServiceData, timeout_ns_budget: i64) bool {
+        const poll_interval_ns: i64 = 50 * std.time.ns_per_ms;
+        var elapsed: i64 = 0;
+
+        while (elapsed < timeout_ns_budget) {
+            var status: u32 = 0;
+            const pid = syscall.waitpid(svc.pid, &status, os.W.NOHANG) catch break;
+            if (pid == svc.pid) return true;
+
+            self.env.io.sleep(.fromNanoseconds(poll_interval_ns), .real) catch {};
+            elapsed += poll_interval_ns;
+        }
+        return false;
+    }
+
+    pub fn stopAll(self: *ServiceTable) void {
+        for (self.services) |*svc| {
+            if (!svc.running or svc.pid <= 0) continue;
+            log.info("Stopping service {s} (pid {d})", .{ svc.decl.name, svc.pid });
+            _ = os.kill(svc.pid, os.SIG.TERM);
+        }
+
+        const start = std.Io.Clock.now(.real, self.env.io);
+        for (self.services) |*svc| {
+            if (!svc.running or svc.pid <= 0) continue;
+            const now = std.Io.Clock.now(.real, self.env.io);
+            const elapsed_ns = (now.toSeconds() - start.toSeconds()) * std.time.ns_per_s; // adjust to actual nsec-precision accessor if available
+            const remaining = TIMEOUT_NS - elapsed_ns;
+            if (remaining > 0) _ = self.waitForExit(svc, remaining);
+        }
+
+        for (self.services) |*svc| {
+            if (!svc.running or svc.pid <= 0) continue;
+            log.warn("Service {s} (pid {d}) did not exit in time, sending SIGKILL", .{ svc.decl.name, svc.pid });
+            _ = os.kill(svc.pid, os.SIG.KILL);
+            var status: u32 = 0;
+            _ = syscall.waitpid(svc.pid, &status, 0) catch {};
+            svc.running = false;
+            svc.pid = -1;
+        }
+    }
+
+    pub fn shutdown(self: *ServiceTable) void {
+        self.stopAll();
     }
 
     pub fn deinit(self: *ServiceTable) void {
