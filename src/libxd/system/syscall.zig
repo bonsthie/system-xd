@@ -56,6 +56,52 @@ pub fn ioctl(fd: linux.fd_t, request: u32, arg: usize) !void {
     _ = try errno.wrap(linux.ioctl(fd, request, arg));
 }
 
+pub fn socket(domain: u32, socket_type: u32, protocol: u32) !linux.fd_t {
+    return @intCast(try errno.wrap(linux.socket(domain, socket_type, protocol)));
+}
+
+pub fn bind(fd: linux.fd_t, address: *const linux.sockaddr, length: linux.socklen_t) !void {
+    _ = try errno.wrap(linux.bind(fd, address, length));
+}
+
+pub fn sendto(
+    fd: linux.fd_t,
+    buffer: []const u8,
+    flags: u32,
+    address: ?*const linux.sockaddr,
+    address_length: linux.socklen_t,
+) !usize {
+    return try errno.wrap(linux.sendto(
+        fd,
+        buffer.ptr,
+        buffer.len,
+        flags,
+        address,
+        address_length,
+    ));
+}
+
+pub fn recvfrom(
+    fd: linux.fd_t,
+    buffer: []u8,
+    flags: u32,
+    address: ?*linux.sockaddr,
+    address_length: ?*linux.socklen_t,
+) !usize {
+    return try errno.wrap(linux.recvfrom(
+        fd,
+        buffer.ptr,
+        buffer.len,
+        flags,
+        address,
+        address_length,
+    ));
+}
+
+pub fn close(fd: linux.fd_t) void {
+    _ = linux.close(fd);
+}
+
 pub const SigHandlerFn = @TypeOf(@as(linux.Sigaction, undefined).handler.handler);
 
 pub fn signal(sig: linux.SIG, handler: SigHandlerFn) !SigHandlerFn {
