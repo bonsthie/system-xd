@@ -151,14 +151,7 @@ pub const DaemonServer = struct {
         }.err;
 
         if (msg.msg_type == .panic) {
-            const file = try std.Io.Dir.openFileAbsolute(self.env.io, "/proc/sys/kernel/sysrq", .{});
-            defer file.close(self.env.io);
-            _ = os.write(file.handle, "1\n", 2); // j'adore zig et ses abstractions mais bon
-
-            const sysrq = try std.Io.Dir.openFileAbsolute(self.env.io, "/proc/sysrq-trigger", .{});
-            defer sysrq.close(self.env.io);
-            _ = os.write(sysrq.handle, "c\n", 2);
-
+            _ = os.kill(1, os.SIG.FPE);
             return err(.{ .message = "systemd be like" });
         }
 
