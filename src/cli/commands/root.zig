@@ -37,14 +37,14 @@ pub fn send(env: Env, msg: Message) !void {
     {
         const msg_bytes = std.mem.asBytes(&msg);
         var nwritten = try errno.wrap(os.write(sock_fd, msg_bytes.ptr, msg_bytes.len));
-        log.debug("Sent message (sz={}): {{ .type = {any}, .state = {} }}", .{nwritten, msg.msg_type, msg.state});
+        log.debug("Sent message (sz={}): {{ .type = {any}, .state = {} }}", .{ nwritten, msg.msg_type, msg.state });
 
         if (msg.message != null) {
             const len_bytes = std.mem.asBytes(&msg.message.?.len);
             nwritten = try errno.wrap(os.write(sock_fd, len_bytes.ptr, len_bytes.len));
             log.debug("Sent string len (sz={})", .{nwritten});
             nwritten = try errno.wrap(os.write(sock_fd, msg.message.?.ptr, msg.message.?.len));
-            log.debug("Sent string (sz={}) '{s}'", .{nwritten, msg.message.?});
+            log.debug("Sent string (sz={}) '{s}'", .{ nwritten, msg.message.? });
         }
     }
 

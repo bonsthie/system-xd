@@ -22,7 +22,7 @@ pub const SOCKET_PATH = SOCKET_DIR ++ "/xdaemon.sock";
 pub const LOCKFILE_PATH: [*:0]const u8 = SOCKET_DIR ++ "/xdaemon.pid";
 
 fn signalHandler(sig: os.SIG) callconv(.c) void {
-    if (current_server) |server| { 
+    if (current_server) |server| {
         if (sig == os.SIG.CHLD) server.reap = true;
         if (sig == os.SIG.INT) server.running = false;
     }
@@ -112,7 +112,7 @@ pub const DaemonServer = struct {
         const msg_bytes = std.mem.asBytes(&msg);
         const nread = try read(client_fd, msg_bytes.ptr, msg_bytes.len);
 
-        log.debug("Received message (sz={}): {{ .type = {any}, .state = {} }}", .{nread, msg.msg_type, msg.state});
+        log.debug("Received message (sz={}): {{ .type = {any}, .state = {} }}", .{ nread, msg.msg_type, msg.state });
 
         if (msg.message != null) {
             var len: usize = 0;

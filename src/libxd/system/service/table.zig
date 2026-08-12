@@ -241,7 +241,7 @@ pub const ServiceTable = struct {
             // for (0..decl.name.len) |j| log.debug("decl.name[{d}]={c}", .{ j, decl.name[j] });
             // for (decl.name) |c| log.debug("c={c}", .{c});
 
-            log.debug("Adding service {s} at {d}", .{decl.name, i});
+            log.debug("Adding service {s} at {d}", .{ decl.name, i });
             srvArray[i] = .{ .decl = decl, .running = false, .pid = -1 };
             i += 1;
         }

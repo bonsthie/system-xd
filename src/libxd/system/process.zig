@@ -195,7 +195,7 @@ fn spawnPosixWithTTY(tty: TTY, exec: *const ExecPosix, config: *const Config) !o
         const args = exec.args orelse getDefaultArgs();
         const default_envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
         const envp = exec.envp orelse default_envp;
-    
+
         if (config.cwd) |cwd| {
             syscall.chdir(cwd) catch {};
         }

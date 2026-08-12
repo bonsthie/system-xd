@@ -1,5 +1,3 @@
-
-
 const std = @import("std");
 const os = std.os.linux;
 const log = std.log.scoped(.networkd);

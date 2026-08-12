@@ -14,10 +14,10 @@ var daemon_pid: ?os.pid_t = null;
 var env: ?*Env = null;
 
 fn intoRebootSyscall(value: os.LINUX_REBOOT.CMD) void {
-    log.debug("Sending SIGINT to daemon (pid {d})", .{ daemon_pid.? });
+    log.debug("Sending SIGINT to daemon (pid {d})", .{daemon_pid.?});
     _ = os.kill(daemon_pid.?, os.SIG.INT);
     if (!ServiceTable.waitForExit(env.?.*, daemon_pid.?, TIMEOUT_NS)) {
-        log.warn("Daemon (pid {d}) did not exit in time, sending SIGKILL", .{ daemon_pid.? });
+        log.warn("Daemon (pid {d}) did not exit in time, sending SIGKILL", .{daemon_pid.?});
         _ = os.kill(daemon_pid.?, os.SIG.KILL);
         _ = ServiceTable.waitForExit(env.?.*, daemon_pid.?, TIMEOUT_NS);
     }
@@ -28,8 +28,12 @@ fn intoRebootSyscall(value: os.LINUX_REBOOT.CMD) void {
     unreachable;
 }
 
-fn triggerReboot(_: os.SIG) callconv(.c) void { intoRebootSyscall(.RESTART); }
-fn triggerShutdown(_: os.SIG) callconv(.c) void { intoRebootSyscall(.POWER_OFF); }
+fn triggerReboot(_: os.SIG) callconv(.c) void {
+    intoRebootSyscall(.RESTART);
+}
+fn triggerShutdown(_: os.SIG) callconv(.c) void {
+    intoRebootSyscall(.POWER_OFF);
+}
 
 fn reapChildren(_: os.SIG) callconv(.c) void {
     while (true) {
@@ -60,22 +64,16 @@ pub fn disableCad() !void {
 
 pub fn startAndWatchDaemon(e: Env) !void {
     env = @constCast(&e);
-    daemon_pid = try process.spawnFromFd(
-        1,
-        &.{
-            .native = .{ 
-                .allocator = e.allocator,
-                .command = "/sbin/xd",
-                .args = &[_][]const u8{ "/sbin/xd", "daemon" },
-                .environ = @constCast(e.environ), 
-            }
-        },
-        &.{
-            .mode = .write_only,
-            .ownTty = false,
-            .cwd = "/",
-        }
-    );
+    daemon_pid = try process.spawnFromFd(1, &.{ .native = .{
+        .allocator = e.allocator,
+        .command = "/sbin/xd",
+        .args = &[_][]const u8{ "/sbin/xd", "daemon" },
+        .environ = @constCast(e.environ),
+    } }, &.{
+        .mode = .write_only,
+        .ownTty = false,
+        .cwd = "/",
+    });
     log.info("Started daemon with pid {d}", .{daemon_pid.?});
 }
 
