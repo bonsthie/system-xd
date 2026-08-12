@@ -33,6 +33,7 @@ var buffer: [1024]u8 = std.mem.zeroes([1024]u8);
 pub const DaemonServer = struct {
     socket: os.socket_t,
     lock_fd: i32,
+    service_dir: []const u8,
     services: service.ServiceTable,
     env: Env,
     running: bool = true,
@@ -156,7 +157,10 @@ pub const DaemonServer = struct {
         }
 
         if (msg.msg_type == .reload) {
-            // self.reload();
+            self.services.reload(self.service_dir) catch |e| {
+                log.err("Failed to reload services: {s}", .{@errorName(e)});
+                return err(.{ .message = "Failed to reload services" });
+            };
             return ok(.{ .message = "reloaded" });
         }
 
@@ -244,6 +248,7 @@ pub fn create(env: Env, service_dir: []const u8) !DaemonServer {
     return DaemonServer{
         .socket = sock_fd,
         .lock_fd = lock_fd,
+        .service_dir = service_dir,
         .services = serviceTable,
         .env = env,
     };

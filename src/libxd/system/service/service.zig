@@ -16,6 +16,33 @@ pub const Service = struct {
     tty: ?[]const u8 = null, // if set, open+claim this tty before exec
     stoppable: bool = true,
 
+    fn sliceEql(a: []const []const u8, b: []const []const u8) bool {
+        if (a.len != b.len) return false;
+        for (a, b) |x, y| {
+            if (!std.mem.eql(u8, x, y)) return false;
+        }
+        return true;
+    }
+
+    pub fn eql(self: Service, other: Service) bool {
+        if (!std.mem.eql(u8, self.name, other.name)) return false;
+        if (!std.mem.eql(u8, self.path, other.path)) return false;
+        if (!sliceEql(self.argv, other.argv)) return false;
+        if (self.clear_env != other.clear_env) return false;
+        if (!sliceEql(self.envp, other.envp)) return false;
+        if (self.restart != other.restart) return false;
+        if (self.stoppable != other.stoppable) return false;
+
+        const tty_eql = blk: {
+            if (self.tty == null and other.tty == null) break :blk true;
+            if (self.tty == null or other.tty == null) break :blk false;
+            break :blk std.mem.eql(u8, self.tty.?, other.tty.?);
+        };
+        if (!tty_eql) return false;
+
+        return true;
+    }
+
     fn formatArray(writer: *std.Io.Writer, array: []const []const u8) !void {
         try writer.print("[", .{});
         var i: usize = 0;

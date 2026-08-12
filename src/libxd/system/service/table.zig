@@ -89,7 +89,7 @@ pub const ServiceTable = struct {
         return null;
     }
 
-    pub fn findByName(self: *ServiceTable, name: []const u8) ?*ServiceData {
+    pub fn findByName(self: *const ServiceTable, name: []const u8) ?*ServiceData {
         for (self.services) |*svc| {
             if (std.mem.eql(u8, svc.decl.name, name)) return svc;
         }
@@ -118,6 +118,46 @@ pub const ServiceTable = struct {
                 log.debug("Reaped untracked pid {d}, status {d}", .{ pid, status });
             }
         }
+    }
+
+    pub fn reload(self: *ServiceTable, dirname: []const u8) !void {
+        log.info("Reloading services from {s}", .{dirname});
+        const new_table = ServiceTable.create(self.env, dirname) catch |err| {
+            log.err("Failed to create new ServiceTable: {s}", .{@errorName(err)});
+            return error.FailedToCreateServiceTable;
+        };
+
+        for (self.services) |*old_svc| {
+            if (new_table.findByName(old_svc.decl.name)) |new_svc| {
+                if (old_svc.decl.eql(new_svc.decl)) {
+                    if (old_svc.running) {
+                        log.debug("Service {s} unchanged, keeping pid {d}", .{ old_svc.decl.name, old_svc.pid });
+                        new_svc.pid = old_svc.pid;
+                        new_svc.running = true;
+                    }
+                } else {
+                    log.info("Service {s} changed, restarting", .{old_svc.decl.name});
+                    self.stop(old_svc);
+                }
+            } else {
+                log.info("Service {s} removed, stopping", .{old_svc.decl.name});
+                self.stop(old_svc);
+            }
+        }
+
+        self.deinit();
+        self.services = new_table.services;
+
+        for (self.services) |*svc| {
+            if (!svc.running) {
+                log.debug("New service {s} not running, spawning", .{svc.decl.name});
+                self.spawn(svc) catch |err| {
+                    log.err("Failed to spawn service {s}: {s}", .{ svc.decl.name, @errorName(err) });
+                };
+            }
+        }
+
+        log.info("Reload complete: {d} services", .{self.services.len});
     }
 
     pub fn stop(self: *ServiceTable, svc: *ServiceData) void {
