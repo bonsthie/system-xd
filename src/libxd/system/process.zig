@@ -186,8 +186,12 @@ fn spawnPosixWithTTY(tty: TTY, exec: *const ExecPosix, config: *const Config) !o
 
         switch (tty) {
             .none => {},
-            .fd => |fd| _ = try newTTY(fd, config.mode, config.ownTty),
-            .name => |name| _ = try newTTYFromName(name.io, name.path, config.mode, config.ownTty),
+            .fd => |fd| _ = newTTY(fd, config.mode, config.ownTty) catch |err| {
+                log.err("Failed to create new TTY for process {s}: {s}", .{exec.command orelse getDefaultCommand(), @errorName(err)});
+            },
+            .name => |name| _ = newTTYFromName(name.io, name.path, config.mode, config.ownTty) catch |err| {
+                log.err("Failed to create new TTY for process {s}: {s}", .{exec.command orelse getDefaultCommand(), @errorName(err)});
+            },
         }
         // TODO set term attribute ?
 
@@ -200,7 +204,7 @@ fn spawnPosixWithTTY(tty: TTY, exec: *const ExecPosix, config: *const Config) !o
             syscall.chdir(cwd) catch {};
         }
 
-        try syscall.execve(command, args, envp);
+        syscall.execve(command, args, envp) catch {};
         os.exit(1);
     }
     return @intCast(pid);
