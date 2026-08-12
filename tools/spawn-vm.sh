@@ -46,6 +46,7 @@ if [ ! -f "$ROOTFS_IMG" ]; then
 
 	echo -n "supermachine" > "$ROOTFS_MNT/etc/hostname"
 	cp -r ./default-services "$ROOTFS_MNT/etc/services.xd"
+	cp -r ../example "$ROOTFS_MNT/root/example"
 
 	log "Unmounting rootfs..."
 	guestunmount "$ROOTFS_MNT"

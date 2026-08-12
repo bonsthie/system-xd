@@ -8,4 +8,3 @@ argv = [
 ]
 
 restart = "never"
-enabled = true

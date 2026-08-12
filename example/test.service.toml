@@ -13,4 +13,3 @@ envp = [
 ]
 
 restart = "always"
-enabled = true

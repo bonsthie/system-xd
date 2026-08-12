@@ -17,9 +17,9 @@ const MessageType = messageModule.MessageType;
 
 var current_server: ?*DaemonServer = null;
 
-pub const SOCKET_DIR = "./run/xd";
-pub const SOCKET_PATH = SOCKET_DIR ++ "/daemon.sock";
-pub const LOCKFILE_PATH: [*:0]const u8 = SOCKET_DIR ++ "/daemon.pid";
+pub const SOCKET_DIR = "/tmp"; //TODO: "/run/xd";
+pub const SOCKET_PATH = SOCKET_DIR ++ "/xdaemon.sock";
+pub const LOCKFILE_PATH: [*:0]const u8 = SOCKET_DIR ++ "/xdaemon.pid";
 
 fn signalHandler(sig: os.SIG) callconv(.c) void {
     if (current_server) |server| { 
@@ -179,6 +179,9 @@ pub const DaemonServer = struct {
         }
         if (msg.msg_type == .start or msg.msg_type == .stop) {
             if (status and msg.msg_type == .stop) {
+                if (!srv.decl.stoppable) {
+                    return err(.{ .message = "Service is not stoppable" });
+                }
                 self.services.stop(srv);
                 return ok(.{ .message = "Service stopped" });
             }
@@ -212,6 +215,7 @@ pub fn create(env: Env, service_dir: []const u8) !DaemonServer {
         return err;
     };
 
+    log.debug("Creating service table at {s}", .{service_dir});
     var serviceTable = ServiceTable.create(env, service_dir) catch |err| blk: {
         log.debug("Failed to create service table: {s}", .{@errorName(err)});
         break :blk ServiceTable{ .services = &.{}, .env = env };

@@ -19,6 +19,7 @@ pub fn main(proc_init: std.process.Init) !u8 {
         .io = proc_init.io,
         .allocator = proc_init.gpa,
         .environ = proc_init.environ_map,
+        .init = false,
     };
     const args = try proc_init.minimal.args.toSlice(proc_init.arena.allocator());
 

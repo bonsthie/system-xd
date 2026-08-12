@@ -185,23 +185,28 @@ pub const ServiceTable = struct {
     }
 
     pub fn create(env: Env, dirName: []const u8) !ServiceTable {
+        log.debug("Creating service table at {s}", .{dirName});
         try std.Io.Dir.createDirPath(.cwd(), env.io, dirName);
 
         const dir = try std.Io.Dir.openDir(.cwd(), env.io, dirName, .{ .iterate = true });
         defer dir.close(env.io);
 
+        log.debug("Initial iteration", .{});
         var size: usize = 0;
         var dirIterator = dir.iterate();
         while (try dirIterator.next(env.io)) |entry| {
             if (entry.kind != .file) continue;
             if (!std.mem.endsWith(u8, entry.name, SERVICE_FILE_SUFFIX)) continue;
+            log.debug("Found candidate: {s}", .{entry.name});
             size += 1;
         }
+        log.debug("Found {d} candidates", .{size});
 
         var srvArray = try env.allocator.alloc(ServiceData, size);
         errdefer env.allocator.free(srvArray);
 
         var i: usize = 0;
+        log.debug("Iterating over {d} candidates", .{size});
         dirIterator = dir.iterate();
         while (try dirIterator.next(env.io)) |entry| {
             if (entry.kind != .file) continue;
@@ -210,13 +215,17 @@ pub const ServiceTable = struct {
             const absPath = try std.fs.path.join(env.allocator, &[_][]const u8{ dirName, entry.name });
             defer env.allocator.free(absPath);
 
+            log.debug("Parsing service {s}", .{absPath});
             const decl = parser.fromToml(env, absPath) catch {
                 log.warn("Failed to parse service {s}", .{absPath});
                 continue;
             };
 
+            // log.debug("Checking for duplicate service", .{});
             var good = true;
             for (0..i) |j| {
+                if (j == i) break;
+                // log.debug("Checking against {d}", .{j});
                 if (std.mem.eql(u8, srvArray[j].decl.name, decl.name)) {
                     log.warn("Service named {s} already exists", .{decl.name});
                     good = false;
@@ -225,6 +234,14 @@ pub const ServiceTable = struct {
             }
             if (!good) continue;
 
+            // log.debug("decl={*}", .{&decl});
+            // log.debug("decl.name={*}", .{&decl.name});
+            // log.debug("decl.name.len={d}", .{decl.name.len});
+            // log.debug("first char addr={*}", .{&decl.name[0]});
+            // for (0..decl.name.len) |j| log.debug("decl.name[{d}]={c}", .{ j, decl.name[j] });
+            // for (decl.name) |c| log.debug("c={c}", .{c});
+
+            log.debug("Adding service {s} at {d}", .{decl.name, i});
             srvArray[i] = .{ .decl = decl, .running = false, .pid = -1 };
             i += 1;
         }

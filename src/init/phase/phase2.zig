@@ -40,7 +40,6 @@ const PhaseStep = step.Step(Ctx);
 pub const Steps = [_]PhaseStep{
     .{ .msg = "Mount kernel virtual filesystems", .func = mountKernelVirtualFilesystems },
     .{ .msg = "Attach /dev/kmsg", .func = attachKmsg },
-    .{ .msg = "Shut printk", .func = disablePrintk },
     .{ .msg = "Parse kernel arguments", .func = parseKernelArguments },
     .{ .msg = "Setup signal handlers", .func = setupSignalHandlers },
     .{ .msg = "Disable CAD syskey", .func = disableCadSyskey },
@@ -50,6 +49,7 @@ pub const Steps = [_]PhaseStep{
     .{ .msg = "Read /etc/environ.xd", .func = readInitRc },
     .{ .msg = "Parse fstab", .func = parseFstab },
     .{ .msg = "Mount user filesystems", .func = mountUserFilesystems },
+    .{ .msg = "Shut printk", .func = disablePrintk },
     .{ .msg = "Start login services", .func = startServices },
     //TODO: replace startServices with a step that starts the daemon and keeps its pid
 };

@@ -60,7 +60,8 @@ pub fn disableCad() !void {
 
 pub fn startAndWatchDaemon(e: Env) !void {
     env = @constCast(&e);
-    daemon_pid = try process.spawn(
+    daemon_pid = try process.spawnFromFd(
+        1,
         &.{
             .native = .{ 
                 .allocator = e.allocator,
@@ -69,7 +70,11 @@ pub fn startAndWatchDaemon(e: Env) !void {
                 .environ = @constCast(e.environ), 
             }
         },
-        &.{}
+        &.{
+            .mode = .write_only,
+            .ownTty = false,
+            .cwd = "/",
+        }
     );
     log.info("Started daemon with pid {d}", .{daemon_pid.?});
 }

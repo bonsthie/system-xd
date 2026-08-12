@@ -12,4 +12,3 @@ envp = [
 clear_env = true
 
 restart = "never"
-enabled = true

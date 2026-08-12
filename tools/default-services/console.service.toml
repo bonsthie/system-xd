@@ -3,3 +3,4 @@ path = "/bin/busybox"
 argv = ["/bin/busybox", "login"]
 tty = "/dev/console"
 restart = "always"
+stoppable = false

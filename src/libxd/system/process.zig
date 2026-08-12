@@ -80,6 +80,8 @@ pub const Exec = union(enum) {
 pub const Config = struct {
     mode: OpenMode = .read_write,
     newProcess: bool = true,
+    cwd: ?[*:0]const u8 = null,
+    ownTty: bool = true,
 };
 
 const TTY = union(enum) {
@@ -123,11 +125,11 @@ pub fn newTTY(fd: i32, mode: OpenMode, claim_ctty: bool) !i32 {
     if (mode == .write_only or mode == .read_write) {
         try syscall.dup2(fd, os.STDOUT_FILENO);
         try syscall.dup2(fd, os.STDERR_FILENO);
-        const seq = "\x1b[2J\x1b[H";
-        _ = os.write(fd, seq, seq.len);
     }
 
     if (claim_ctty) {
+        const seq = "\x1b[2J\x1b[H";
+        _ = os.write(fd, seq, seq.len);
         const TIOCSCTTY: u32 = 0x540E;
         syscall.ioctl(fd, TIOCSCTTY, 0) catch |err| {
             log.err("TIOCSCTTY failed on fd {d}: {s}", .{ fd, @errorName(err) });
@@ -144,9 +146,7 @@ pub fn newTTYFromName(io: std.Io, file: []const u8, mode: OpenMode, claim_ctty: 
         return error.NewTTYOpenFail;
     };
     defer if (fd_file.handle > 2) fd_file.close(io);
-    const ret = try newTTY(fd_file.handle, mode, claim_ctty);
-    log.info("{s} is created successfully", .{file});
-    return ret;
+    return try newTTY(fd_file.handle, mode, claim_ctty);
 }
 
 fn getDefaultCommand() [*:0]const u8 {
@@ -186,8 +186,8 @@ fn spawnPosixWithTTY(tty: TTY, exec: *const ExecPosix, config: *const Config) !o
 
         switch (tty) {
             .none => {},
-            .fd => |fd| _ = try newTTY(fd, config.mode, true),
-            .name => |name| _ = try newTTYFromName(name.io, name.path, config.mode, true),
+            .fd => |fd| _ = try newTTY(fd, config.mode, config.ownTty),
+            .name => |name| _ = try newTTYFromName(name.io, name.path, config.mode, config.ownTty),
         }
         // TODO set term attribute ?
 
@@ -195,6 +195,11 @@ fn spawnPosixWithTTY(tty: TTY, exec: *const ExecPosix, config: *const Config) !o
         const args = exec.args orelse getDefaultArgs();
         const default_envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
         const envp = exec.envp orelse default_envp;
+    
+        if (config.cwd) |cwd| {
+            syscall.chdir(cwd) catch {};
+        }
+
         try syscall.execve(command, args, envp);
         os.exit(1);
     }
