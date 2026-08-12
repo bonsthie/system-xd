@@ -21,10 +21,29 @@ fn emergencyShell(initError: anyerror) void {
     log.err("Caught an unexpected error: {s}", .{@errorName(initError)});
     log.err("Dropping you in an emergency shell, you're on your own...", .{});
 
-    const argv = &[_:null]?[*:0]const u8{ "/bin/sh", "-i" };
+    _ = os.sync();
+
+    const console = os.open("/dev/console", .{ .ACCMODE = .RDWR, .CREAT = false }, 0);
+    if (console >= 0) {
+        const console_fd: i32 = @intCast(console);
+        _ = os.dup2(console_fd, os.STDIN_FILENO);
+        _ = os.dup2(console_fd, os.STDOUT_FILENO);
+        _ = os.dup2(console_fd, os.STDERR_FILENO);
+        _ = os.close(console_fd);
+    }
+
+    const fd = os.open("/bin/sh", .{ .ACCMODE = .RDONLY, .CREAT = false }, 0);
+    if (fd < 0) {
+        log.err("No /bin/sh available, ouchie.", .{});
+        syscall.reboot(.MAGIC1, .MAGIC2, .HALT, null) catch {};
+        return;
+    }
+    _ = os.close(@intCast(fd));
+
+    const argv = &[_:null]?[*:0]const u8{ "/bin/busybox", "sh", "-i" };
     const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
 
-    syscall.execve("/bin/sh", argv, envp) catch |err| {
+    syscall.execve("/bin/busybox", argv, envp) catch |err| {
         log.err("Failed to execve /bin/sh: {}, rebooting...", .{err});
     };
     _ = os.sync();

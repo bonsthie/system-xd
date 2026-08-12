@@ -4,7 +4,10 @@
 
 ## Usage
 
-`TODO`
+To run a virtual-machine running **system-xd**, simply run:
+```
+$ bash ./tools/spawn-vm.sh
+```
 
 ## How to compile
 

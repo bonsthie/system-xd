@@ -6,7 +6,7 @@ const Env = xd.system.Env;
 
 const daemonModule = @import("../daemon/root.zig");
 
-pub const SERVICE_DIR = "/etc/services.xd/";
+pub const SERVICE_DIR = "/etc/xd/services";
 
 pub fn daemon(env: Env, args: []const []const u8) !void {
     const service_dir = if (args.len > 0) args[0] else SERVICE_DIR;

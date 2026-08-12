@@ -1,4 +1,4 @@
 name = "random-seed"
 path = "/bin/sh"
-argv = ["/bin/sh", "/etc/init/random-seed.sh"]
+argv = ["/bin/sh", "/etc/xd/scripts/random-seed.sh"]
 restart = "always"

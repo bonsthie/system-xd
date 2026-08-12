@@ -9,7 +9,6 @@ const operations = @import("../operations/root.zig");
 const step = @import("step.zig");
 
 const root_mount = "/mnt";
-const module_list = "/modules.xd";
 
 pub const Ctx = struct {
     env: Env,
@@ -68,7 +67,7 @@ fn parseKernelArguments(ctx: *Ctx) !void {
 }
 
 fn loadRequiredModules(ctx: *Ctx) !void {
-    try operations.modules.loadRequired(ctx.env, module_list);
+    try operations.modules.load(ctx.env);
 }
 
 fn resolveRoot(ctx: *Ctx) !void {

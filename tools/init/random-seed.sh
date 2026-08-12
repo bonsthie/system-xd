@@ -3,7 +3,7 @@
 # every 60 seconds for the rest of the process lifetime.
 
 SEED_FILE="/var/lib/random-seed"
-SEED_SIZE=512
+SEED_SIZE=1024
 
 if [ -f "$SEED_FILE" ]; then
     cat "$SEED_FILE" > /dev/urandom

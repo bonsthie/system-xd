@@ -15,20 +15,22 @@ var daemon_pid: ?os.pid_t = null;
 fn intoRebootSyscall(value: os.LINUX_REBOOT.CMD) void {
     log.debug("Sending SIGINT to daemon (pid {d})", .{daemon_pid.?});
     _ = os.kill(daemon_pid.?, os.SIG.INT);
+
     log.debug("Waiting for daemon to exit", .{});
     if (!ServiceTable.waitForExit(daemon_pid.?, TIMEOUT_NS)) {
         log.warn("Daemon (pid {d}) did not exit in time, sending SIGKILL", .{daemon_pid.?});
         _ = os.kill(daemon_pid.?, os.SIG.KILL);
         _ = ServiceTable.waitForExit(daemon_pid.?, TIMEOUT_NS);
     }
-    log.debug("Daemon exited, rebooting (val={d})", .{value});
+    _ = os.sync();
+
     syscall.reboot(.MAGIC1, .MAGIC2, value, null) catch |err| {
-        log.err("Failed to reboot: {s}", .{@errorName(err)});
+        log.err("Failed to syscall.reboot: {s}", .{@errorName(err)});
     };
-    log.debug("That didn't work, rebooting with HALT", .{});
     syscall.reboot(.MAGIC1, .MAGIC2, .HALT, null) catch |err| {
-        log.err("Failed to reboot with HALT: {s}", .{@errorName(err)});
+        log.err("Failed to syscall.reboot with HALT: {s}", .{@errorName(err)});
     };
+
     log.debug("That didn't work, looping forever", .{});
     while (true) {
         syscall.reboot(.MAGIC1, .MAGIC2, .HALT, null) catch {};

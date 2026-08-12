@@ -89,9 +89,11 @@ pub fn setHostname(env: Env, cmdline: ?*const Cmdline) !void {
     log.info("Hostname set to {s}", .{hostname_z});
 }
 
+const LOCALE_FILE = "/etc/locale.conf";
+
 pub fn setLocale(env: Env) !void {
-    const data = std.Io.Dir.readFileAlloc(.cwd(), env.io, "/etc/locale.conf", env.allocator, .unlimited) catch {
-        log.warn("Could not read /etc/locale.conf, setting default locale", .{});
+    const data = std.Io.Dir.readFileAlloc(.cwd(), env.io, LOCALE_FILE, env.allocator, .unlimited) catch {
+        log.warn("Could not read {s}, setting default locale", .{ LOCALE_FILE });
         env.environ.put("LANG", "C.UTF-8") catch {};
         return;
     };
@@ -117,9 +119,11 @@ pub fn setLocale(env: Env) !void {
     }
 }
 
+const ENVIRON_FILE = "/etc/xd/environ";
+
 pub fn readInitRc(env: Env) !void {
-    const data = std.Io.Dir.readFileAlloc(.cwd(), env.io, "/etc/environ.xd", env.allocator, .unlimited) catch {
-        log.warn("Could not read /etc/environ.xd, skipping.", .{});
+    const data = std.Io.Dir.readFileAlloc(.cwd(), env.io, ENVIRON_FILE, env.allocator, .unlimited) catch {
+        log.warn("Could not read {s}, skipping.", .{ ENVIRON_FILE });
         return;
     };
 

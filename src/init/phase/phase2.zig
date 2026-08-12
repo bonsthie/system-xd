@@ -49,6 +49,7 @@ pub const Steps = [_]PhaseStep{
     .{ .msg = "Read /etc/environ.xd", .func = readInitRc },
     .{ .msg = "Parse fstab", .func = parseFstab },
     .{ .msg = "Mount user filesystems", .func = mountUserFilesystems },
+    .{ .msg = "Load user kernel modules", .func = loadUserModules },
     .{ .msg = "Shut printk", .func = disablePrintk },
     .{ .msg = "Start login services", .func = startServices },
 };
@@ -109,6 +110,10 @@ fn parseFstab(ctx: *Ctx) !void {
 
 fn mountUserFilesystems(ctx: *Ctx) !void {
     try operations.mounts.configuredFilesystems(ctx.env, try ctx.requireFstab());
+}
+
+fn loadUserModules(ctx: *Ctx) !void {
+    try operations.modules.load(ctx.env);
 }
 
 fn startServices(ctx: *Ctx) !void {

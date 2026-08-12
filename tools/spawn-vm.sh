@@ -45,8 +45,8 @@ if [ ! -f "$ROOTFS_IMG" ]; then
 	tar -xzf alpine-minirootfs.tar.gz -C "$ROOTFS_MNT"
 
 	echo -n "supermachine" > "$ROOTFS_MNT/etc/hostname"
-	cp -r ./init "$ROOTFS_MNT/etc/init"
-	cp -r ./default-services "$ROOTFS_MNT/etc/services.xd"
+	cp -r ./init "$ROOTFS_MNT/etc/xd/scripts"
+	cp -r ./default-services "$ROOTFS_MNT/etc/xd/services"
 	cp -r ../example "$ROOTFS_MNT/root/example"
 	echo "* * * * * echo salut > /crontest" >> "$ROOTFS_MNT/etc/crontabs/root"
 	echo "* * * * * echo SALUT > /home/user/crontest" >> "$ROOTFS_MNT/etc/crontabs/user"
@@ -100,13 +100,14 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 	cp -v ../zig-out/bin/init $RAMFS_GEN/init
 	NEW_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
 	mkdir -p "$ROOTFS_MNT"
-	mkdir -p "$ROOTFS_MNT"
 
 	guestmount \
 		-a "$ROOTFS_IMG" \
 		-m /dev/sda \
 		"$ROOTFS_MNT"
 
+	mkdir -p "$RAMFS_GEN/etc/xd/"
+	mkdir -p "$ROOTFS_MNT/etc/xd/{services,network}"
 	rm -vf "$ROOTFS_MNT/sbin/init"
 	cp -v ../zig-out/bin/init "$ROOTFS_MNT/sbin/init"
 	touch "$ROOTFS_MNT/.rootfs-marker"
@@ -115,7 +116,7 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 	guestunmount "$ROOTFS_MNT"
 
 	REQUIRED_MODULES="virtio_blk"
-	python3 ./resolve-modules.py $RAMFS_GEN lib/modules/6.12.8-0-virt $REQUIRED_MODULES > $RAMFS_GEN/modules.xd
+	python3 ./resolve-modules.py $RAMFS_GEN lib/modules/6.12.8-0-virt $REQUIRED_MODULES > $RAMFS_GEN/etc/xd/modules.conf
 
 	if [ "$OLD_HASH" != "$NEW_HASH" ]; then
 		log "initramfs changed, rebuilding"

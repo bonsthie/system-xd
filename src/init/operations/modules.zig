@@ -4,10 +4,14 @@ const system = @import("xd").system;
 const Env = system.Env;
 const log = std.log.scoped(.module);
 
-pub fn loadRequired(env: Env, list_path: []const u8) !void {
-    log.debug("+ Loading modules from {s}", .{list_path});
+const LIST_PATH = "/etc/xd/modules.conf";
 
-    const file = try std.Io.Dir.openFileAbsolute(env.io, list_path, .{});
+pub fn load(env: Env) !void {
+    log.debug("Loading modules from {s}", .{ LIST_PATH });
+    const file = std.Io.Dir.openFileAbsolute(env.io, LIST_PATH, .{}) catch {
+        log.debug("Couldn't open {s}, skipping", .{ LIST_PATH });
+        return;
+    };
     defer file.close(env.io);
 
     const stat = try file.stat(env.io);
@@ -22,7 +26,7 @@ pub fn loadRequired(env: Env, list_path: []const u8) !void {
         const path = std.mem.trim(u8, raw_line, " \t\r");
         if (path.len == 0) continue;
 
-        log.debug("+ Loading module {s}", .{path});
+        log.debug("Loading module {s}", .{path});
         try system.kernel_module.load(env, path);
     }
 }

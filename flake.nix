@@ -3,24 +3,38 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixpkgs-unstable";
-    systems.url = "github:nix-systems/x86_64-linux";
   };
 
   outputs =
     { self, nixpkgs, ... }@inputs:
     let
-      systems = (import inputs.systems);
-      forAllSystems = nixpkgs.lib.genAttrs systems;
+      inherit (self) outputs;
+
+      forAllSystems =
+        function:
+        nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed (
+          system: function nixpkgs.legacyPackages.${system}
+        );
     in
     {
-      devShells = forAllSystems (system:
-        let
-          pkgs = import nixpkgs { inherit system; };
-        in {
-          default = (import ./shell.nix) {
-            inherit pkgs;
-          };
-        }
-      );
+      formatter = forAllSystems (pkgs: pkgs.nixfmt);
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            python3
+            zig
+            e2tools
+            qemu
+            mount
+            cpio
+            libarchive
+            fd
+            libguestfs-with-appliance
+          ];
+          shellHook = ''
+            unset ZIG_GLOBAL_CACHE_DIR
+          '';
+        };
+      });
     };
 }
