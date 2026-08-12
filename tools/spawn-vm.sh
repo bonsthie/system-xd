@@ -44,6 +44,7 @@ if [ ! -f "$ROOTFS_IMG" ]; then
 	log "Copying rootfs..."
 	tar -xzf alpine-minirootfs.tar.gz -C "$ROOTFS_MNT"
 
+	mkdir -p "$ROOTFS_MNT/etc/xd/"
 	echo -n "supermachine" > "$ROOTFS_MNT/etc/hostname"
 	cp -r ./init "$ROOTFS_MNT/etc/xd/scripts"
 	cp -r ./default-services "$ROOTFS_MNT/etc/xd/services"

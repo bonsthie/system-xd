@@ -46,7 +46,7 @@ pub const Steps = [_]PhaseStep{
     .{ .msg = "Set system time", .func = setTime },
     .{ .msg = "Set system hostname", .func = setHostname },
     .{ .msg = "Set system locale", .func = setLocale },
-    .{ .msg = "Read /etc/environ.xd", .func = readInitRc },
+    .{ .msg = "Read system environment", .func = readInitRc },
     .{ .msg = "Parse fstab", .func = parseFstab },
     .{ .msg = "Mount user filesystems", .func = mountUserFilesystems },
     .{ .msg = "Load user kernel modules", .func = loadUserModules },
