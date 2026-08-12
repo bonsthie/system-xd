@@ -121,31 +121,37 @@ pub const ServiceTable = struct {
     }
 
     pub fn stop(self: *ServiceTable, svc: *ServiceData) void {
+        _ = self;
         if (!svc.running or svc.pid <= 0) return;
 
         log.info("Stopping service {s} (pid {d})", .{ svc.decl.name, svc.pid });
         _ = os.kill(svc.pid, os.SIG.TERM);
 
-        if (!waitForExit(self.env, svc.pid, TIMEOUT_NS)) {
+        if (!waitForExit(svc.pid, TIMEOUT_NS)) {
             log.warn("Service {s} (pid {d}) did not exit in time, sending SIGKILL", .{ svc.decl.name, svc.pid });
             _ = os.kill(svc.pid, os.SIG.KILL);
-            _ = waitForExit(self.env, svc.pid, TIMEOUT_NS);
+            _ = waitForExit(svc.pid, TIMEOUT_NS);
         }
 
         svc.running = false;
         svc.pid = -1;
     }
 
-    pub fn waitForExit(env: Env, pid: os.pid_t, timeout_ns_budget: i64) bool {
+    pub fn waitForExit(pid: os.pid_t, timeout_ns_budget: i64) bool {
         const poll_interval_ns: i64 = 50 * std.time.ns_per_ms;
         var elapsed: i64 = 0;
 
+        log.debug("Waiting for pid {d} to exit", .{pid});
         while (elapsed < timeout_ns_budget) {
             var status: u32 = 0;
+            log.debug("waitpid({d}, &status, os.W.NOHANG)", .{pid});
             const ret_pid = syscall.waitpid(pid, &status, os.W.NOHANG) catch break;
+            log.debug("waitpid returned {d}", .{ret_pid});
             if (ret_pid == pid) return true;
 
-            env.io.sleep(.fromNanoseconds(poll_interval_ns), .real) catch {};
+            log.debug("sleeping for {d} ns", .{poll_interval_ns});
+            _ = os.nanosleep(&.{ .sec = 0, .nsec = poll_interval_ns }, null);
+            log.debug("done sleeping", .{});
             elapsed += poll_interval_ns;
         }
         return false;
@@ -164,7 +170,7 @@ pub const ServiceTable = struct {
             const now = std.Io.Clock.now(.real, self.env.io);
             const elapsed_ns = (now.toSeconds() - start.toSeconds()) * std.time.ns_per_s; // adjust to actual nsec-precision accessor if available
             const remaining = TIMEOUT_NS - elapsed_ns;
-            if (remaining > 0) _ = waitForExit(self.env, svc.pid, remaining);
+            if (remaining > 0) _ = waitForExit(svc.pid, remaining);
         }
 
         for (self.services) |*svc| {

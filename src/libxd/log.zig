@@ -3,8 +3,8 @@ const log = std.log;
 
 var log_io = std.Io.Threaded.init_single_threaded;
 
-var log_err = std.Io.File.stderr();
-var log_out = std.Io.File.stdout();
+const log_err = std.Io.File.stderr();
+const log_out = std.Io.File.stdout();
 
 pub fn customLogFn(
     comptime level: log.Level,

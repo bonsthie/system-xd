@@ -11,17 +11,15 @@ const TIMEOUT_NS = system.service.table.TIMEOUT_NS;
 const syscall = system.syscall;
 
 var daemon_pid: ?os.pid_t = null;
-var env: ?*Env = null;
 
 fn intoRebootSyscall(value: os.LINUX_REBOOT.CMD) void {
-    log.debug("env is pointing to {*}", .{env});
     log.debug("Sending SIGINT to daemon (pid {d})", .{daemon_pid.?});
     _ = os.kill(daemon_pid.?, os.SIG.INT);
     log.debug("Waiting for daemon to exit", .{});
-    if (!ServiceTable.waitForExit(env.?.*, daemon_pid.?, TIMEOUT_NS)) {
+    if (!ServiceTable.waitForExit(daemon_pid.?, TIMEOUT_NS)) {
         log.warn("Daemon (pid {d}) did not exit in time, sending SIGKILL", .{daemon_pid.?});
         _ = os.kill(daemon_pid.?, os.SIG.KILL);
-        _ = ServiceTable.waitForExit(env.?.*, daemon_pid.?, TIMEOUT_NS);
+        _ = ServiceTable.waitForExit(daemon_pid.?, TIMEOUT_NS);
     }
     log.debug("Daemon exited, rebooting (val={d})", .{value});
     syscall.reboot(.MAGIC1, .MAGIC2, value, null) catch |err| {
@@ -74,13 +72,12 @@ pub fn disableCad() !void {
     _ = try syscall.reboot(.MAGIC1, .MAGIC2, .CAD_OFF, null);
 }
 
-pub fn startAndWatchDaemon(e: Env) !void {
-    env = @constCast(&e);
+pub fn startAndWatchDaemon(env: Env) !void {
     daemon_pid = try process.spawnFromFd(1, &.{ .native = .{
-        .allocator = e.allocator,
+        .allocator = env.allocator,
         .command = "/sbin/xd",
         .args = &[_][]const u8{ "/sbin/xd", "daemon" },
-        .environ = @constCast(e.environ),
+        .environ = @constCast(env.environ),
     } }, &.{
         .mode = .write_only,
         .ownTty = false,
