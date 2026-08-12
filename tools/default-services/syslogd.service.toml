@@ -1,0 +1,4 @@
+name = "syslogd"
+path = "/sbin/syslogd"
+argv = ["/sbin/syslogd", "-n"]
+restart = "always"

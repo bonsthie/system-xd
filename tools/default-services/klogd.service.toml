@@ -1,0 +1,4 @@
+name = "klogd"
+path = "/sbin/klogd"
+argv = ["/sbin/klogd", "-n"]
+restart = "always"

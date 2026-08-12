@@ -1,0 +1,4 @@
+name = "crond"
+path = "/sbin/crond"
+argv = ["/sbin/crond", "-f", "-d", "8"]
+restart = "always"

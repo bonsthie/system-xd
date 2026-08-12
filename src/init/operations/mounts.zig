@@ -39,6 +39,7 @@ pub fn kernelVirtualFilesystems(env: Env) !void {
             else => return err,
         };
     }
+    try std.Io.Dir.createDirPath(.cwd(), env.io, "/var/log");
 }
 
 pub fn configuredFilesystems(env: Env, fstab: *const Fstab) !void {

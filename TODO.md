@@ -4,10 +4,11 @@
 - [ ] Reload command/function
 
 ## xd cli
-- [ ] Enable/Disable commands
+- [x] Enable/Disable commands
 
 ## Services:
 - [ ] Network stuff
   - [ ] xd-networkd ?????? my goat.
-- [ ] Cron
-- [ ] Syslog
+- [x] Cron
+- [x] Syslog
+- [x] Random Seed
