@@ -55,6 +55,32 @@ pub const Reader = struct {
     }
 };
 
+pub fn receiveAck(fd: abi.FileDescriptor, sequence: u32) !void {
+    var response: [64 * 1024]u8 = undefined;
+
+    while (true) {
+        const response_length = try syscall.recvfrom(
+            fd,
+            &response,
+            0,
+            null,
+            null,
+        );
+        if (response_length == 0) return error.MalformedMessage;
+
+        var reader = Reader.init(response[0..response_length]);
+        while (try reader.next()) |message| {
+            if (message.header.seq != sequence) continue;
+
+            return switch (message.header.type) {
+                .ERROR => message.checkError(),
+                .OVERRUN => error.ResponseOverrun,
+                else => error.UnexpectedMessage,
+            };
+        }
+    }
+}
+
 fn readHeader(bytes: []const u8) !abi.MessageHeader {
     if (bytes.len < @sizeOf(abi.MessageHeader)) return error.MalformedMessage;
 

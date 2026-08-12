@@ -56,7 +56,7 @@ pub fn set(self: Self, fd: abi.FileDescriptor, sequence: u32) !void {
         .type = NameAttribute,
         .count = 0,
     });
-    var request = try Request.init(
+    var request = Request.init(
         .RTM_SETLINK,
         abi.REQUEST | abi.ACK,
         sequence,
@@ -70,33 +70,7 @@ pub fn set(self: Self, fd: abi.FileDescriptor, sequence: u32) !void {
 
     try request.send(fd);
 
-    return receiveAck(fd, sequence);
-}
-
-fn receiveAck(fd: abi.FileDescriptor, sequence: u32) !void {
-    var response: [64 * 1024]u8 = undefined;
-
-    while (true) {
-        const response_length = try syscall.recvfrom(
-            fd,
-            &response,
-            0,
-            null,
-            null,
-        );
-        if (response_length == 0) return error.MalformedMessage;
-
-        var reader = nl_message.Reader.init(response[0..response_length]);
-        while (try reader.next()) |message| {
-            if (message.header.seq != sequence) continue;
-
-            return switch (message.header.type) {
-                .ERROR => message.checkError(),
-                .OVERRUN => error.ResponseOverrun,
-                else => error.UnexpectedMessage,
-            };
-        }
-    }
+    return nl_message.receiveAck(fd, sequence);
 }
 
 fn receive(fd: abi.FileDescriptor, sequence: u32) !Self {
