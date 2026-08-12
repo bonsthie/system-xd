@@ -19,6 +19,8 @@ pub const start = @import("start.zig").start;
 pub const stop = @import("stop.zig").stop;
 pub const restart = @import("restart.zig").restart;
 pub const status = @import("status.zig").status;
+pub const enable = @import("enable.zig").enable;
+pub const disable = @import("disable.zig").disable;
 
 // Helpers
 
