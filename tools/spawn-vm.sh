@@ -48,6 +48,8 @@ if [ ! -f "$ROOTFS_IMG" ]; then
 	cp -r ./init "$ROOTFS_MNT/etc/init"
 	cp -r ./default-services "$ROOTFS_MNT/etc/services.xd"
 	cp -r ../example "$ROOTFS_MNT/root/example"
+	echo "* * * * * echo salut > /crontest" >> "$ROOTFS_MNT/etc/crontabs/root"
+	echo "* * * * * echo SALUT > /home/user/crontest" >> "$ROOTFS_MNT/etc/crontabs/user"
 
 	log "Unmounting rootfs..."
 	guestunmount "$ROOTFS_MNT"

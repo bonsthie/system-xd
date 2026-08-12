@@ -1,10 +1,10 @@
 const std = @import("std");
 const log = std.log;
 
-var log_io: std.Io.Threaded = std.Io.Threaded.init_single_threaded;
+var log_io = std.Io.Threaded.init_single_threaded;
 
-var log_err: std.Io.File = std.Io.File.stderr();
-var log_out: std.Io.File = std.Io.File.stdout();
+var log_err = std.Io.File.stderr();
+var log_out = std.Io.File.stdout();
 
 pub fn customLogFn(
     comptime level: log.Level,
