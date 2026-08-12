@@ -1,5 +1,6 @@
 const os = @import("std").os.linux;
 const system = @import("xd").system;
+const process = system.process;
 
 const Cmdline = system.Cmdline;
 const Env = system.Env;
@@ -15,7 +16,6 @@ pub const Ctx = struct {
     env: Env,
     cmdline: ?Cmdline = null,
     fstab: ?Fstab = null,
-    daemon_pid: ?os.pid_t = null,
 
     pub fn init(env: Env) Ctx {
         return .{ .env = env };
@@ -32,10 +32,6 @@ pub const Ctx = struct {
 
     fn requireFstab(self: *Ctx) !*Fstab {
         return if (self.fstab) |*fstab| fstab else error.FstabNotLoaded;
-    }
-
-    fn requireDaemon(self: *Ctx) !os.pid_t {
-        return self.daemon_pid orelse error.DaemonNotStarted;
     }
 };
 
@@ -117,6 +113,5 @@ fn mountUserFilesystems(ctx: *Ctx) !void {
 }
 
 fn startServices(ctx: *Ctx) !void {
-    //TODO: start `/sbin/xd daemon /etc/services.xd/`
-    operations.pid1.watchDaemon(try ctx.requireDaemon());
+    try operations.pid1.startAndWatchDaemon(ctx.env);
 }

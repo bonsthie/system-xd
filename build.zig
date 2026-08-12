@@ -65,7 +65,6 @@ pub fn build(b: *Build) void {
     });
     b.installArtifact(cli);
 
-
     const xd_networkd = b.addExecutable(.{
         .name = NETWORKD_NAME,
         .root_module = b.createModule(.{

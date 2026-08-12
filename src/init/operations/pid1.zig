@@ -1,17 +1,26 @@
 const std = @import("std");
 const os = std.os.linux;
-const log = std.log.scoped(.syscall);
-const system = @import("xd").system;
+const log = std.log.scoped(.pid1);
+const xd = @import("xd");
+const system = xd.system;
+const process = system.process;
+const Env = system.Env;
 
 const ServiceTable = system.service.ServiceTable;
+const TIMEOUT_NS = system.service.table.TIMEOUT_NS;
 const syscall = system.syscall;
 
 var daemon_pid: ?os.pid_t = null;
+var env: ?*Env = null;
 
 fn intoRebootSyscall(value: os.LINUX_REBOOT.CMD) void {
-    //TODO: send SIGINT to `xd daemon` to trigger a shutdown
-    //      wait for it to exit
-    //      send SIGQUIT if it take too long
+    log.debug("Sending SIGINT to daemon (pid {d})", .{ daemon_pid.? });
+    _ = os.kill(daemon_pid.?, os.SIG.INT);
+    if (!ServiceTable.waitForExit(env.?.*, daemon_pid.?, TIMEOUT_NS)) {
+        log.warn("Daemon (pid {d}) did not exit in time, sending SIGKILL", .{ daemon_pid.? });
+        _ = os.kill(daemon_pid.?, os.SIG.KILL);
+        _ = ServiceTable.waitForExit(env.?.*, daemon_pid.?, TIMEOUT_NS);
+    }
 
     syscall.reboot(.MAGIC1, .MAGIC2, value, null) catch {};
     syscall.reboot(.MAGIC1, .MAGIC2, .HALT, null) catch {};
@@ -49,8 +58,20 @@ pub fn disableCad() !void {
     _ = try syscall.reboot(.MAGIC1, .MAGIC2, .CAD_OFF, null);
 }
 
-pub fn watchDaemon(pid: os.pid_t) void {
-    daemon_pid = pid;
+pub fn startAndWatchDaemon(e: Env) !void {
+    env = @constCast(&e);
+    daemon_pid = try process.spawn(
+        &.{
+            .native = .{ 
+                .allocator = e.allocator,
+                .command = "/sbin/xd",
+                .args = &[_][]const u8{ "/sbin/xd", "daemon" },
+                .environ = @constCast(e.environ), 
+            }
+        },
+        &.{}
+    );
+    log.info("Started daemon with pid {d}", .{daemon_pid.?});
 }
 
 pub fn wait() noreturn {
