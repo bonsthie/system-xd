@@ -14,28 +14,40 @@ var daemon_pid: ?os.pid_t = null;
 var env: ?*Env = null;
 
 fn intoRebootSyscall(value: os.LINUX_REBOOT.CMD) void {
+    log.debug("env is pointing to {*}", .{env});
     log.debug("Sending SIGINT to daemon (pid {d})", .{daemon_pid.?});
     _ = os.kill(daemon_pid.?, os.SIG.INT);
+    log.debug("Waiting for daemon to exit", .{});
     if (!ServiceTable.waitForExit(env.?.*, daemon_pid.?, TIMEOUT_NS)) {
         log.warn("Daemon (pid {d}) did not exit in time, sending SIGKILL", .{daemon_pid.?});
         _ = os.kill(daemon_pid.?, os.SIG.KILL);
         _ = ServiceTable.waitForExit(env.?.*, daemon_pid.?, TIMEOUT_NS);
     }
-
-    syscall.reboot(.MAGIC1, .MAGIC2, value, null) catch {};
-    syscall.reboot(.MAGIC1, .MAGIC2, .HALT, null) catch {};
-    os.exit(1);
+    log.debug("Daemon exited, rebooting (val={d})", .{value});
+    syscall.reboot(.MAGIC1, .MAGIC2, value, null) catch |err| {
+        log.err("Failed to reboot: {s}", .{@errorName(err)});
+    };
+    log.debug("That didn't work, rebooting with HALT", .{});
+    syscall.reboot(.MAGIC1, .MAGIC2, .HALT, null) catch |err| {
+        log.err("Failed to reboot with HALT: {s}", .{@errorName(err)});
+    };
+    log.debug("That didn't work, looping forever", .{});
+    while (true) {
+        syscall.reboot(.MAGIC1, .MAGIC2, .HALT, null) catch {};
+    }
     unreachable;
 }
 
 fn triggerReboot(_: os.SIG) callconv(.c) void {
     intoRebootSyscall(.RESTART);
 }
+
 fn triggerShutdown(_: os.SIG) callconv(.c) void {
     intoRebootSyscall(.POWER_OFF);
 }
 
 fn reapChildren(_: os.SIG) callconv(.c) void {
+    log.info("reaping children", .{});
     while (true) {
         var status: u32 = 0;
         const pid = syscall.waitpid(-1, &status, os.W.NOHANG) catch break;

@@ -6,6 +6,7 @@ const process = @import("../process.zig");
 
 const service = @import("service.zig");
 const parser = @import("parser.zig");
+const ParsedService = parser.ParsedService;
 const Env = @import("../env.zig").Env;
 
 pub const RestartPolicy = service.RestartPolicy;
@@ -17,6 +18,7 @@ pub const TIMEOUT_NS: i64 = 10 * std.time.ns_per_s;
 
 pub const ServiceData = struct {
     decl: Service,
+    arena: std.heap.ArenaAllocator,
     pid: os.pid_t = -1,
     running: bool = false,
 };
@@ -181,6 +183,9 @@ pub const ServiceTable = struct {
     }
 
     pub fn deinit(self: *ServiceTable) void {
+        for (self.services) |*svc| {
+            svc.arena.deinit();
+        }
         self.env.allocator.free(self.services);
     }
 
@@ -203,7 +208,9 @@ pub const ServiceTable = struct {
         log.debug("Found {d} candidates", .{size});
 
         var srvArray = try env.allocator.alloc(ServiceData, size);
-        errdefer env.allocator.free(srvArray);
+        errdefer {
+            env.allocator.free(srvArray);
+        }
 
         var i: usize = 0;
         log.debug("Iterating over {d} candidates", .{size});
@@ -216,10 +223,11 @@ pub const ServiceTable = struct {
             defer env.allocator.free(absPath);
 
             log.debug("Parsing service {s}", .{absPath});
-            const decl = parser.fromToml(env, absPath) catch {
+            const parsed = parser.fromToml(env, absPath) catch {
                 log.warn("Failed to parse service {s}", .{absPath});
                 continue;
             };
+            const decl = parsed.value;
 
             // log.debug("Checking for duplicate service", .{});
             var good = true;
@@ -229,6 +237,7 @@ pub const ServiceTable = struct {
                 if (std.mem.eql(u8, srvArray[j].decl.name, decl.name)) {
                     log.warn("Service named {s} already exists", .{decl.name});
                     good = false;
+                    parsed.deinit();
                     break;
                 }
             }
@@ -242,7 +251,7 @@ pub const ServiceTable = struct {
             // for (decl.name) |c| log.debug("c={c}", .{c});
 
             log.debug("Adding service {s} at {d}", .{ decl.name, i });
-            srvArray[i] = .{ .decl = decl, .running = false, .pid = -1 };
+            srvArray[i] = .{ .decl = decl, .arena = parsed.arena, .running = false, .pid = -1 };
             i += 1;
         }
         size = i;
