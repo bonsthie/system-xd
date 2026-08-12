@@ -10,17 +10,16 @@ const rtc_device = "/dev/rtc0";
 const default_epoch: i64 = 1_735_689_600;
 
 pub fn disablePrintk(env: Env) !void {
-    // const file = std.Io.Dir.openFileAbsolute(env.io, "/proc/sys/kernel/printk", .{ .mode = .write_only }) catch |err| {
-    //     log.warn("Could not open /proc/sys/kernel/printk: {s}", .{@errorName(err)});
-    //     return;
-    // };
-    // defer file.close(env.io);
-    //
-    // var writer_buffer: [16]u8 = undefined;
-    // var writer = file.writerStreaming(env.io, &writer_buffer);
-    // try writer.interface.print("1\n", .{});
-    // try writer.interface.flush();
-    _ = env;
+    const file = std.Io.Dir.openFileAbsolute(env.io, "/proc/sys/kernel/printk", .{ .mode = .write_only }) catch |err| {
+        log.warn("Could not open /proc/sys/kernel/printk: {s}", .{@errorName(err)});
+        return;
+    };
+    defer file.close(env.io);
+
+    var writer_buffer: [16]u8 = undefined;
+    var writer = file.writerStreaming(env.io, &writer_buffer);
+    try writer.interface.print("1\n", .{});
+    try writer.interface.flush();
 }
 
 pub fn setTime(env: Env) !void {
