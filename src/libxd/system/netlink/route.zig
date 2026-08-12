@@ -1,4 +1,7 @@
+const std = @import("std");
 const abi = @import("abi.zig");
+const address = @import("address.zig");
+const nl_message = @import("message.zig");
 const syscall = @import("../syscall.zig");
 
 const Self = @This();
@@ -8,16 +11,17 @@ sequence: u32,
 
 pub const Link = @import("link.zig");
 
-pub const IPv4Address = [4]u8;
-
-pub const AddressOptions = struct {
-    address: IPv4Address,
-    prefix: u8,
-};
+pub const IPv4Address = address.IPv4Address;
+pub const AddressOptions = address.Options;
 
 pub const RouteOptions = struct {
     interface: Link,
     gateway: IPv4Address,
+};
+
+const IPv4RouteAttribute = extern struct {
+    header: abi.Attribute,
+    value: [4]u8,
 };
 
 pub fn init() !Self {
@@ -28,13 +32,13 @@ pub fn init() !Self {
     );
     errdefer syscall.close(fd);
 
-    var address: abi.NetlinkAddress = .{
+    var nl_address: abi.NetlinkAddress = .{
         .pid = 0,
         .groups = 0,
     };
     try syscall.bind(
         fd,
-        @ptrCast(&address),
+        @ptrCast(&nl_address),
         @intCast(@sizeOf(abi.NetlinkAddress)),
     );
 
@@ -67,14 +71,48 @@ pub fn setLink(self: *Self, link: Link) !void {
 }
 
 pub fn addAddress(self: *Self, link: Link, options: AddressOptions) !void {
-    _ = self;
-    _ = link;
-    _ = options;
-    return error.NotImplemented;
+    const sequence = self.nextSequence();
+    return address.add(self.fd, sequence, link, options);
 }
 
 pub fn addRoute(self: *Self, options: RouteOptions) !void {
-    _ = self;
-    _ = options;
-    return error.NotImplemented;
+    const sequence = self.nextSequence();
+    if (options.interface.index == 0 or
+        options.interface.index > std.math.maxInt(c_int))
+    {
+        return error.InvalidLinkIndex;
+    }
+
+    const interface_index = options.interface.index;
+    const Request = nl_message.FixedBuilder(abi.RouteHeader, .{
+        .type = IPv4RouteAttribute,
+        .count = 2,
+    });
+    var request = try Request.init(
+        .RTM_NEWROUTE,
+        abi.REQUEST | abi.ACK | abi.CREATE | abi.EXCLUSIVE,
+        sequence,
+    ).withPayload(.{
+        .family = abi.INET,
+        .destination_length = 0,
+        .source_length = 0,
+        .tos = 0,
+        .table = abi.MAIN_TABLE,
+        .protocol = abi.BOOT_PROTOCOL,
+        .scope = abi.UNIVERSE_SCOPE,
+        .type = abi.UNICAST_ROUTE,
+        .flags = 0,
+    }).withAttributes(.{
+        .{
+            .type = .{ .route = .GATEWAY },
+            .value = &options.gateway,
+        },
+        .{
+            .type = .{ .route = .OIF },
+            .value = std.mem.asBytes(&interface_index),
+        },
+    });
+    try request.send(self.fd);
+
+    return nl_message.receiveAck(self.fd, sequence);
 }
