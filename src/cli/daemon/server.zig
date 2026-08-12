@@ -172,6 +172,7 @@ pub const DaemonServer = struct {
         }
         if (msg.msg_type == .start or msg.msg_type == .stop) {
             if (status and msg.msg_type == .stop) {
+                log.debug("Stopping service {s}", .{srv.decl.name});
                 if (!srv.decl.stoppable) {
                     return err(.{ .message = "Service is not stoppable" });
                 }
@@ -179,6 +180,7 @@ pub const DaemonServer = struct {
                 return ok(.{ .message = "Service stopped" });
             }
             if (!status and msg.msg_type == .start) {
+                log.debug("Spawning service {s}", .{srv.decl.name});
                 self.services.spawn(srv) catch |e| {
                     log.err("Failed to spawn service {s}: {s}", .{ srv.decl.name, @errorName(e) });
                     return err(.{ .message = "Failed to start service" });

@@ -51,7 +51,6 @@ pub const Steps = [_]PhaseStep{
     .{ .msg = "Mount user filesystems", .func = mountUserFilesystems },
     .{ .msg = "Shut printk", .func = disablePrintk },
     .{ .msg = "Start login services", .func = startServices },
-    //TODO: replace startServices with a step that starts the daemon and keeps its pid
 };
 
 pub fn run(env: Env) !noreturn {
