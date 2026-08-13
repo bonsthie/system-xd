@@ -1,97 +1,104 @@
 const std = @import("std");
 const Build = std.Build;
-const Step = Build.Step;
 const Import = Build.Module.Import;
-const Util = @import("build-system/util.zig");
 
-const SRC_DIR = "src/";
+const Executable = struct {
+    name: []const u8,
+    directory: []const u8,
+    root_file: []const u8 = "main.zig",
+    imports: []const Import = &.{},
+    facade: ?Facade = null,
 
-const INIT_DIR = SRC_DIR ++ "init/";
-const INIT_ROOT_FILE = INIT_DIR ++ "main.zig";
-const INIT_NAME = "init";
+    const Facade = struct {
+        name: []const u8,
+        root_file: []const u8 = "root.zig",
+        imports: []const Import = &.{},
+    };
+};
 
-const CLI_DIR = SRC_DIR ++ "cli/";
-const CLI_ROOT_FILE = CLI_DIR ++ "main.zig";
-const CLI_NAME = "xd";
+fn installExecutables(
+    b: *Build,
+    target: Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    executables: []const Executable,
+) void {
+    for (executables) |options| {
+        const root_module = b.createModule(.{
+            .root_source_file = b.path(b.pathJoin(&.{
+                options.directory,
+                options.root_file,
+            })),
+            .target = target,
+            .optimize = optimize,
+            .imports = options.imports,
+        });
 
-const NETWORKD_DIR = SRC_DIR ++ "networkd/";
-const NETWORKD_ROOT_FILE = NETWORKD_DIR ++ "main.zig";
-const NETWORKD_MODULE_ROOT_FILE = NETWORKD_DIR ++ "root.zig";
-const NETWORKD_NAME = "xd-networkd";
+        if (options.facade) |facade_options| {
+            const facade = b.createModule(.{
+                .root_source_file = b.path(b.pathJoin(&.{
+                    options.directory,
+                    facade_options.root_file,
+                })),
+                .target = target,
+                .optimize = optimize,
+                .imports = facade_options.imports,
+            });
+            root_module.addImport(facade_options.name, facade);
+        }
 
-const LIBXD_DIR = SRC_DIR ++ "libxd/";
-const LIBXD_ROOT_FILE = LIBXD_DIR ++ "root.zig";
-const LIBXD_NAME = "xd";
+        const executable = b.addExecutable(.{
+            .name = options.name,
+            .root_module = root_module,
+        });
+        b.installArtifact(executable);
+    }
+}
 
 pub fn build(b: *Build) void {
-    const target = b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .none });
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .Debug });
+    const target = b.resolveTargetQuery(.{
+        .cpu_arch = .x86_64,
+        .os_tag = .linux,
+        .abi = .none,
+    });
+    const optimize = b.standardOptimizeOption(.{});
 
     const toml = b.dependency("toml", .{}).module("toml");
-
-    const libxdImports: []const Import = &.{
-        .{ .name = "toml", .module = toml },
-    };
-
-    const libxd = b.addModule(LIBXD_NAME, .{
-        .root_source_file = b.path(LIBXD_ROOT_FILE),
+    const libxd = b.addModule("xd", .{
+        .root_source_file = b.path("src/libxd/root.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = libxdImports,
+        .imports = &.{
+            .{ .name = "toml", .module = toml },
+        },
     });
 
-    const imports: []const Import = &.{
-        .{ .name = LIBXD_NAME, .module = libxd },
+    const common_imports: []const Import = &.{
+        .{ .name = "xd", .module = libxd },
     };
-
-    const networkdModuleImports: []const Import = &.{
-        .{ .name = LIBXD_NAME, .module = libxd },
+    const networkd_imports: []const Import = &.{
+        .{ .name = "xd", .module = libxd },
         .{ .name = "toml", .module = toml },
     };
 
-    const networkd = b.createModule(.{
-        .root_source_file = b.path(NETWORKD_MODULE_ROOT_FILE),
-        .target = target,
-        .optimize = optimize,
-        .imports = networkdModuleImports,
+    installExecutables(b, target, optimize, &.{
+        .{
+            .name = "init",
+            .directory = "src/init",
+            .imports = common_imports,
+        },
+        .{
+            .name = "xd",
+            .directory = "src/cli",
+            .imports = common_imports,
+        },
+        .{
+            .name = "xd-networkd",
+            .directory = "src/networkd",
+            .imports = common_imports,
+            .facade = .{
+                .name = "networkd",
+                .imports = networkd_imports,
+            },
+        },
     });
-
-    const networkdImports: []const Import = &.{
-        .{ .name = LIBXD_NAME, .module = libxd },
-        .{ .name = "toml", .module = toml },
-        .{ .name = "networkd", .module = networkd },
-    };
-
-    const init = b.addExecutable(.{
-        .name = INIT_NAME,
-        .root_module = b.createModule(.{
-            .root_source_file = b.path(INIT_ROOT_FILE),
-            .target = target,
-            .optimize = optimize,
-            .imports = imports,
-        }),
-    });
-    b.installArtifact(init);
-
-    const cli = b.addExecutable(.{
-        .name = CLI_NAME,
-        .root_module = b.createModule(.{
-            .root_source_file = b.path(CLI_ROOT_FILE),
-            .target = target,
-            .optimize = optimize,
-            .imports = imports,
-        }),
-    });
-    b.installArtifact(cli);
-
-    const xd_networkd = b.addExecutable(.{
-        .name = NETWORKD_NAME,
-        .root_module = b.createModule(.{
-            .root_source_file = b.path(NETWORKD_ROOT_FILE),
-            .target = target,
-            .optimize = optimize,
-            .imports = networkdImports,
-        }),
-    });
-    b.installArtifact(xd_networkd);
 }
