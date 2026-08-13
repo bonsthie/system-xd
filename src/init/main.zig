@@ -40,10 +40,10 @@ fn emergencyShell(initError: anyerror) void {
     }
     _ = os.close(@intCast(fd));
 
-    const argv = &[_:null]?[*:0]const u8{ "/bin/busybox", "sh", "-i" };
+    const argv = &[_:null]?[*:0]const u8{ "/bin/sh", "-i" };
     const envp = &[_:null]?[*:0]const u8{ "PATH=/usr/sbin:/sbin:/usr/bin:/bin", "HOME=/", "TERM=linux", "XD_RECOVERY_SHELL=1" };
 
-    syscall.execve("/bin/busybox", argv, envp) catch |err| {
+    syscall.execve("/bin/sh", argv, envp) catch |err| {
         log.err("Failed to execve /bin/sh: {}, rebooting...", .{err});
     };
     _ = os.sync();
