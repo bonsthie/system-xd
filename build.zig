@@ -16,6 +16,7 @@ const CLI_NAME = "xd";
 
 const NETWORKD_DIR = SRC_DIR ++ "networkd/";
 const NETWORKD_ROOT_FILE = NETWORKD_DIR ++ "main.zig";
+const NETWORKD_MODULE_ROOT_FILE = NETWORKD_DIR ++ "root.zig";
 const NETWORKD_NAME = "xd-networkd";
 
 const LIBXD_DIR = SRC_DIR ++ "libxd/";
@@ -43,9 +44,22 @@ pub fn build(b: *Build) void {
         .{ .name = LIBXD_NAME, .module = libxd },
     };
 
+    const networkdModuleImports: []const Import = &.{
+        .{ .name = LIBXD_NAME, .module = libxd },
+        .{ .name = "toml", .module = toml },
+    };
+
+    const networkd = b.createModule(.{
+        .root_source_file = b.path(NETWORKD_MODULE_ROOT_FILE),
+        .target = target,
+        .optimize = optimize,
+        .imports = networkdModuleImports,
+    });
+
     const networkdImports: []const Import = &.{
         .{ .name = LIBXD_NAME, .module = libxd },
         .{ .name = "toml", .module = toml },
+        .{ .name = "networkd", .module = networkd },
     };
 
     const init = b.addExecutable(.{

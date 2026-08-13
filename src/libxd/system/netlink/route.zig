@@ -17,6 +17,34 @@ pub const AddressOptions = address.Options;
 pub const RouteOptions = struct {
     interface: Link,
     gateway: IPv4Address,
+
+    pub fn parse(
+        interface: Link,
+        destination: ?[]const u8,
+        gateway: ?[]const u8,
+    ) !RouteOptions {
+        if (destination) |text| {
+            const parsed_destination = AddressOptions.parse(text) catch {
+                return error.InvalidRouteDestination;
+            };
+            if (parsed_destination.prefix != 0 or
+                !std.mem.eql(u8, &parsed_destination.address, &.{ 0, 0, 0, 0 }))
+            {
+                return error.UnsupportedRouteDestination;
+            }
+        }
+
+        const gateway_text = gateway orelse return error.MissingRouteGateway;
+        const parsed_gateway = std.Io.net.Ip4Address.parse(
+            gateway_text,
+            0,
+        ) catch return error.InvalidRouteGateway;
+
+        return .{
+            .interface = interface,
+            .gateway = parsed_gateway.bytes,
+        };
+    }
 };
 
 const IPv4RouteAttribute = extern struct {

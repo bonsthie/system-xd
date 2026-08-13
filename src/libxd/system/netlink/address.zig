@@ -8,6 +8,31 @@ pub const IPv4Address = [4]u8;
 pub const Options = struct {
     address: IPv4Address,
     prefix: u8,
+
+    pub fn parse(text: []const u8) !Options {
+        const separator = std.mem.indexOfScalar(u8, text, '/') orelse {
+            return error.MissingAddressPrefix;
+        };
+        if (std.mem.indexOfScalar(u8, text[separator + 1 ..], '/') != null) {
+            return error.InvalidAddress;
+        }
+
+        const parsed_address = std.Io.net.Ip4Address.parse(
+            text[0..separator],
+            0,
+        ) catch return error.InvalidAddress;
+        const prefix = std.fmt.parseInt(
+            u8,
+            text[separator + 1 ..],
+            10,
+        ) catch return error.InvalidAddressPrefix;
+        if (prefix > 32) return error.InvalidAddressPrefix;
+
+        return .{
+            .address = parsed_address.bytes,
+            .prefix = prefix,
+        };
+    }
 };
 
 const IPv4Attribute = extern struct {

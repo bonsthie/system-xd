@@ -12,7 +12,7 @@ const Command = xd.command.Command;
 pub const commandMapping = ssm.StaticStringMap(Command).initComptime(.{
     .{ "help", Command{ .desc = xd.command.defaults.help.desc, .func = help } },
     .{ "load", Command{ .desc = "Loads network configuration from <path>...", .func = commands.load } },
-    .{ "dump", Command{ .desc = "Dumps network configuration from <path>...", .func = commands.load } },
+    .{ "dump", Command{ .desc = "Dumps network configuration from <path>...", .func = commands.dump } },
 });
 
 pub fn run(env: Env, name: []const u8, args: []const []const u8) !void {
