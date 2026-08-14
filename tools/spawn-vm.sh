@@ -48,7 +48,7 @@ if [ ! -f "$ROOTFS_IMG" ]; then
 	echo -n "supermachine" > "$ROOTFS_MNT/etc/hostname"
 	cp -r ./init "$ROOTFS_MNT/etc/xd/scripts"
 	cp -r ./default-services "$ROOTFS_MNT/etc/xd/services"
-	cp -r ../example "$ROOTFS_MNT/root/example"
+	cp -r ./network "$ROOTFS_MNT/etc/xd/network"
 	echo "* * * * * echo salut > /crontest" >> "$ROOTFS_MNT/etc/crontabs/root"
 	echo "* * * * * echo SALUT > /home/user/crontest" >> "$ROOTFS_MNT/etc/crontabs/user"
 
@@ -110,14 +110,17 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 	mkdir -p "$RAMFS_GEN/etc/xd/"
 	mkdir -p "$ROOTFS_MNT/etc/xd/{services,network}"
 	rm -vf "$ROOTFS_MNT/sbin/init"
-	cp -v ../zig-out/bin/init "$ROOTFS_MNT/sbin/init"
 	touch "$ROOTFS_MNT/.rootfs-marker"
+	cp -v ../zig-out/bin/init "$ROOTFS_MNT/sbin/init"
 	cp -v ../zig-out/bin/xd "$ROOTFS_MNT/sbin/xd"
+	cp -v ../zig-out/bin/xd-networkd "$ROOTFS_MNT/sbin/xd-networkd"
+	echo $'Welcome to system-xd, the ziggest™ of projects\n' > "$ROOTFS_MNT/etc/motd"
 
 	guestunmount "$ROOTFS_MNT"
 
-	REQUIRED_MODULES="virtio_blk"
+	REQUIRED_MODULES="virtio_blk virtio_net"
 	python3 ./resolve-modules.py $RAMFS_GEN lib/modules/6.12.8-0-virt $REQUIRED_MODULES > $RAMFS_GEN/etc/xd/modules.conf
+	cat $RAMFS_GEN/etc/xd/modules.conf
 
 	if [ "$OLD_HASH" != "$NEW_HASH" ]; then
 		log "initramfs changed, rebuilding"
@@ -191,6 +194,8 @@ else
 		-m 2048 \
 		-kernel "$DISTRO_BOOT/vmlinuz-virt" \
 		-initrd "$INITRAMFS_BOOT" \
+		-netdev user,id=net0 \
+		-device virtio-net-pci,netdev=net0,id=nic0 \
 		-drive file="$ROOTFS_IMG",format=raw,if=virtio \
 		-append "root=/dev/vda rootfstype=ext4 rw $CMDLINE_TTY" \
 		-nographic

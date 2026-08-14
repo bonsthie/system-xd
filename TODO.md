@@ -1,14 +1,6 @@
 # TODO (the second coming)
 
-## xd daemon
-- [ ] Reload command/function
-
-## xd cli
-- [x] Enable/Disable commands
-
-## Services:
-- [ ] Network stuff
-  - [ ] xd-networkd ?????? my goat.
-- [x] Cron
-- [x] Syslog
-- [x] Random Seed
+- cli/daemon
+  - [ ] Add "enabled" status back to the service, but get it from the filename (.disabled.toml or not)
+    - That way, even disabled services can be started/stopped
+    - Make sure reloading after a service changed enabled state doesn't restart it

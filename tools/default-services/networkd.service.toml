@@ -1,0 +1,4 @@
+name = "networkd"
+path = "/sbin/xd-networkd"
+argv = ["/sbin/xd-networkd", "load"]
+restart = "never" # oneshot service

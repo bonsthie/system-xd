@@ -1,0 +1,9 @@
+[match]
+name = "eth0"
+
+[network]
+required = true
+addresses = ["10.0.2.15/24"]
+
+[[route]]
+gateway = "10.0.2.2"
