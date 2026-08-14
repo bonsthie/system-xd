@@ -26,7 +26,7 @@ fi
 
 log "Building system-xd"
 cd ..
-zig build || exit
+zig build -Doptimize=ReleaseSafe || exit
 cd tools
 
 if [ ! -f "$ROOTFS_IMG" ]; then
