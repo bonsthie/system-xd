@@ -7,9 +7,9 @@ const log = std.log.scoped(.module);
 const LIST_PATH = "/etc/xd/modules.conf";
 
 pub fn load(env: Env) !void {
-    log.debug("Loading modules from {s}", .{ LIST_PATH });
+    log.debug("Loading modules from {s}", .{LIST_PATH});
     const file = std.Io.Dir.openFileAbsolute(env.io, LIST_PATH, .{}) catch {
-        log.debug("Couldn't open {s}, skipping", .{ LIST_PATH });
+        log.debug("Couldn't open {s}, skipping", .{LIST_PATH});
         return;
     };
     defer file.close(env.io);

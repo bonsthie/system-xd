@@ -93,7 +93,7 @@ const LOCALE_FILE = "/etc/locale.conf";
 
 pub fn setLocale(env: Env) !void {
     const data = std.Io.Dir.readFileAlloc(.cwd(), env.io, LOCALE_FILE, env.allocator, .unlimited) catch {
-        log.warn("Could not read {s}, setting default locale", .{ LOCALE_FILE });
+        log.warn("Could not read {s}, setting default locale", .{LOCALE_FILE});
         env.environ.put("LANG", "C.UTF-8") catch {};
         return;
     };
@@ -123,7 +123,7 @@ const ENVIRON_FILE = "/etc/xd/environ";
 
 pub fn readInitRc(env: Env) !void {
     const data = std.Io.Dir.readFileAlloc(.cwd(), env.io, ENVIRON_FILE, env.allocator, .unlimited) catch {
-        log.warn("Could not read {s}, skipping.", .{ ENVIRON_FILE });
+        log.warn("Could not read {s}, skipping.", .{ENVIRON_FILE});
         return;
     };
 
