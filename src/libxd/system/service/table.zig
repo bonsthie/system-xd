@@ -21,6 +21,7 @@ pub const ServiceData = struct {
     arena: std.heap.ArenaAllocator,
     pid: os.pid_t = -1,
     running: bool = false,
+    enabled: bool = true,
 };
 
 pub const ServiceTable = struct {
@@ -30,6 +31,7 @@ pub const ServiceTable = struct {
     pub fn spawnAll(self: *ServiceTable) void {
         var i: usize = 0;
         for (self.services) |*svc| {
+            if (!svc.enabled) continue;
             self.spawn(svc) catch |err| {
                 log.err("Failed to spawn service {s}: {s}", .{ svc.decl.name, @errorName(err) });
                 i += 1;
@@ -136,7 +138,7 @@ pub const ServiceTable = struct {
                         new_svc.running = true;
                     }
                 } else {
-                    log.info("Service {s} changed, restarting", .{old_svc.decl.name});
+                    log.info("Service {s} changed, stopping", .{old_svc.decl.name});
                     self.stop(old_svc);
                 }
             } else {
@@ -147,15 +149,6 @@ pub const ServiceTable = struct {
 
         self.deinit();
         self.services = new_table.services;
-
-        for (self.services) |*svc| {
-            if (!svc.running) {
-                log.debug("New service {s} not running, spawning", .{svc.decl.name});
-                self.spawn(svc) catch |err| {
-                    log.err("Failed to spawn service {s}: {s}", .{ svc.decl.name, @errorName(err) });
-                };
-            }
-        }
 
         log.info("Reload complete: {d} services", .{self.services.len});
     }
@@ -235,6 +228,12 @@ pub const ServiceTable = struct {
         self.env.allocator.free(self.services);
     }
 
+    fn classifyServiceFile(name: []const u8) ?bool {
+        if (std.mem.endsWith(u8, name, SERVICE_FILE_SUFFIX)) return true;
+        if (std.mem.endsWith(u8, name, SERVICE_FILE_SUFFIX_DISABLED)) return false;
+        return null;
+    }
+
     pub fn create(env: Env, dirName: []const u8) !ServiceTable {
         log.debug("Creating service table at {s}", .{dirName});
         try std.Io.Dir.createDirPath(.cwd(), env.io, dirName);
@@ -247,7 +246,7 @@ pub const ServiceTable = struct {
         var dirIterator = dir.iterate();
         while (try dirIterator.next(env.io)) |entry| {
             if (entry.kind != .file) continue;
-            if (!std.mem.endsWith(u8, entry.name, SERVICE_FILE_SUFFIX)) continue;
+            if (classifyServiceFile(entry.name) == null) continue;
             log.debug("Found candidate: {s}", .{entry.name});
             size += 1;
         }
@@ -263,7 +262,7 @@ pub const ServiceTable = struct {
         dirIterator = dir.iterate();
         while (try dirIterator.next(env.io)) |entry| {
             if (entry.kind != .file) continue;
-            if (!std.mem.endsWith(u8, entry.name, SERVICE_FILE_SUFFIX)) continue;
+            const enabled = classifyServiceFile(entry.name) orelse continue;
 
             const absPath = try std.fs.path.join(env.allocator, &[_][]const u8{ dirName, entry.name });
             defer env.allocator.free(absPath);
@@ -297,7 +296,7 @@ pub const ServiceTable = struct {
             // for (decl.name) |c| log.debug("c={c}", .{c});
 
             log.debug("Adding service {s} at {d}", .{ decl.name, i });
-            srvArray[i] = .{ .decl = decl, .arena = parsed.arena, .running = false, .pid = -1 };
+            srvArray[i] = .{ .decl = decl, .arena = parsed.arena, .pid = -1, .running = false, .enabled = enabled };
             i += 1;
         }
         size = i;

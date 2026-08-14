@@ -24,6 +24,11 @@ if [ ! -d $DISTRO_BOOT ]; then
 	mv $TMP_TARGET $DISTRO_BOOT
 fi
 
+log "Building system-xd"
+cd ..
+zig build || exit
+cd tools
+
 if [ ! -f "$ROOTFS_IMG" ]; then
 	log "Downloading Alpine minirootfs"
 	wget "$ALPINE_ROOTFS_URL" -O alpine-minirootfs.tar.gz
@@ -82,11 +87,6 @@ if [ $NO_REPLACE_INIT -eq 0 ]; then
 	if [ -f $RAMFS_GEN/init ]; then
 		OLD_HASH=$(sha256sum $RAMFS_GEN/init | cut -d' ' -f1)
 	fi
-
-	log "Building system-xd"
-	cd ..
-	zig build || exit
-	cd tools
 
 	log "Copying ramfs to $RAMFS_GEN"
 	rm -rf $RAMFS_GEN
