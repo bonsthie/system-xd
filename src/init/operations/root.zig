@@ -1,5 +1,4 @@
 pub const kmsg = @import("kmsg.zig");
-pub const login = @import("login.zig");
 pub const machine = @import("machine.zig");
 pub const modules = @import("modules.zig");
 pub const mounts = @import("mounts.zig");
