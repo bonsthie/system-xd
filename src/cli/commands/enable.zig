@@ -9,6 +9,7 @@ const SERVICE_DIR = @import("daemon.zig").SERVICE_DIR;
 pub fn enable(env: Env, args: []const []const u8) !void {
     if (args.len < 1) {
         log.err("Usage: xd enable <service name>", .{});
+        return;
     }
     const service_name = args[0];
     const target_dir = if (args.len > 1) args[1] else SERVICE_DIR;
